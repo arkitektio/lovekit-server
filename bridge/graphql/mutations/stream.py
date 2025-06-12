@@ -21,9 +21,11 @@ async def create_video_stream(info: Info, input: inputs.CreateStreamInput) -> ty
 
     agent, _ = await models.Agent.objects.aget_or_create(
         user=info.context.request.user,
-        app=info.context.request.app,
-        name=input.instance_id,
+        client=info.context.request.client,
+        instance_id=input.instance_id,
     )
+    
+   
 
     # Check if room exists.
 
@@ -45,7 +47,7 @@ async def create_video_stream(info: Info, input: inputs.CreateStreamInput) -> ty
             api_secret=settings.LIVEKIT["API_SECRET"],
         )
         .with_identity("agent-" + str(agent.id))
-        .with_name("agent-" + agent.name)
+        .with_name("agent-" + str(agent.id))
         .with_grants(
             api.VideoGrants(
                 room_join=True,
@@ -57,11 +59,12 @@ async def create_video_stream(info: Info, input: inputs.CreateStreamInput) -> ty
 
     print(token)
 
-    exp, _ = await models.Stream.objects.aupdate_or_create(
+    stream, _ = await models.Stream.objects.aupdate_or_create(
         title=input.title or "default", agent=agent, defaults=dict(token=token)
     )
 
-    return exp
+    
+    return stream
 
 
 @strawberry.input
@@ -72,14 +75,8 @@ class JoinStreamInput:
 async def join_video_stream(info: Info, input: JoinStreamInput) -> types.Stream:
     creator = info.context.request.user
 
-    room = await models.Room.objects.aget(id=input.room)
 
-    agent, _ = await models.Agent.objects.get_or_create(
-        user=info.context.request.user,
-        app=info.context.request.app,
-        room=room,
-        name=input.agent_id,
-    )
+    agent, _ = await models.Agent.objects.get(id=id)
 
     token = (
         api.AccessToken()
@@ -88,7 +85,7 @@ async def join_video_stream(info: Info, input: JoinStreamInput) -> types.Stream:
         .with_grants(
             api.VideoGrants(
                 room_join=True,
-                room=room.streamlit_room_id,
+                room=agent.streamlit_room_id,
             )
         )
         .to_jwt()

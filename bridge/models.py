@@ -9,13 +9,20 @@ from authentikate.models import Client, User
 
 class Agent(models.Model):
     instance_id = models.CharField(max_length=10000, null=True)
-    app = models.ForeignKey(Client, on_delete=models.CASCADE)
+    client = models.ForeignKey(Client, on_delete=models.CASCADE)
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name="agents",
         help_text="The user that created this comment",
     )
+    
+    @property
+    def streamlit_room_id(self) -> str:
+        """
+        Returns the room ID for this agent. All streams created by this agent will use this room ID.
+        """
+        return f"agent-streams-{self.id}"
 
 
 class Stream(models.Model):
@@ -34,6 +41,12 @@ class Stream(models.Model):
                 fields=["agent", "title"], name="Unique stream for agent"
             )
         ]
+        
+    def streamlit_room_id(self) -> str:
+        """
+        Returns the room ID for the stream.
+        """
+        return f"agent-stream-id-{self.id}"
 
 
 from .signals import * 

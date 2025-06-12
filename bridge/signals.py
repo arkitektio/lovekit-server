@@ -14,14 +14,14 @@ def publish_pod_change(
 ) -> None:
     """Sends a message to the pod gateway when a pod is updated"""
     if created:
-        channels.pod_channel.broadcast(
-            channel_signals.PodSignal(
+        channels.stream_channel.broadcast(
+            channel_signals.StreamSignal(
                 create=instance.id,
             )
         )
     else:
-        channels.pod_channel.broadcast(
-            channel_signals.PodSignal(
+        channels.stream_channel.broadcast(
+            channel_signals.StreamSignal(
                 update=instance.id,
             )
         )
@@ -36,8 +36,8 @@ def publish_pod_del(
     **kwargs
 ) -> None:
     """Sends a message to the pod gateway when a pod is updated"""
-    channels.pod_channel.broadcast(
-        channel_signals.PodSignal(
+    channels.stream_channel.broadcast(
+        channel_signals.StreamSignal(
             delete=instance.id,
         )
     )

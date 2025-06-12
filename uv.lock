@@ -561,7 +561,65 @@ wheels = [
 ]
 
 [[package]]
-name = "kabinet-server"
+name = "kante"
+version = "0.9.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "channels" },
+    { name = "django" },
+    { name = "strawberry-graphql", extra = ["channels"] },
+    { name = "strawberry-graphql-django" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6e/1b/3627c53b3a996537957482994add6e36c4d14ce88cdce9dc7c9eca2142b9/kante-0.9.0.tar.gz", hash = "sha256:cefb82d6d7e230ee6b50fbe23dd8843a043b17b95eb42be4d39652b97f32a0b2", size = 9307, upload-time = "2025-05-06T09:33:33.163Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cf/07/1f7ac673496df044bb68b189778ed084bb70a7e075ab3670836de0a51d53/kante-0.9.0-py3-none-any.whl", hash = "sha256:1430afdeb3247d3bc4d96462046299babc30211a34a2d52fd2f22bc7d0146a88", size = 11858, upload-time = "2025-05-06T09:33:31.876Z" },
+]
+
+[[package]]
+name = "koherent"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "authentikate" },
+    { name = "django" },
+    { name = "django-simple-history" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a9/a5/a6bf33905ce4389c582da86fd5724ab4556508800308c85018faca35b43a/koherent-0.2.0.tar.gz", hash = "sha256:2904c88fef5a545515da01279bddbd90230bb42292a0cef52d8afe7f400102b8", size = 6825, upload-time = "2025-05-06T12:23:56.097Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3f/ed/1e2cb054985a869f29575d6e9eccae7999168af8b2c7cd50c6ada8ec5a76/koherent-0.2.0-py3-none-any.whl", hash = "sha256:8bf97932074d782843cea67b84075838604ca29679e46a6564dae6edabd148de", size = 8078, upload-time = "2025-05-06T12:23:53.496Z" },
+]
+
+[[package]]
+name = "livekit-api"
+version = "1.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "livekit-protocol" },
+    { name = "protobuf" },
+    { name = "pyjwt" },
+    { name = "types-protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ee/58/19b21a9bf9011a870be0aa7cccf9188f2ae644247d7da8f20935bbb2aa5b/livekit_api-1.0.2.tar.gz", hash = "sha256:5a6726a24761af046bdb4ae32b572d28df728a0e6824805d86783fa94c59574f", size = 14803, upload-time = "2025-04-03T18:17:49.693Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7b/a3/d7eda9924316fcc0b9287ae671094f241c25fa13bc24f18e9c708e58d6b2/livekit_api-1.0.2-py3-none-any.whl", hash = "sha256:81ea2b330a7182c77f3cf307dfcff7df7d0d70524055bfb02be23ac8a45b8c6a", size = 17251, upload-time = "2025-04-03T18:17:48.44Z" },
+]
+
+[[package]]
+name = "livekit-protocol"
+version = "1.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "protobuf" },
+    { name = "types-protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6c/eb/a2bac69a6be3ac1f6a2f6f5e64af8d5d91a8734689b4c1d3dc73ff56d38d/livekit_protocol-1.0.2.tar.gz", hash = "sha256:006dd0de6280681d9e38574a76162bfa826e135a10c1107d21abe52bb7026aef", size = 55697, upload-time = "2025-04-12T10:16:51.754Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/73/e9/6575dac25f15566e940a1f8c519848829e7db8c630d000c9eca572cc76b5/livekit_protocol-1.0.2-py3-none-any.whl", hash = "sha256:560b15f4d021f052ff95189d3e124cc0e20e24799e01d08c9183344e7ea91114", size = 65999, upload-time = "2025-04-12T10:16:50.391Z" },
+]
+
+[[package]]
+name = "lovekit-server"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
@@ -621,64 +679,6 @@ requires-dist = [
 dev = [
     { name = "django-stubs", specifier = ">=5.2.0" },
     { name = "mypy", specifier = ">=1.15.0" },
-]
-
-[[package]]
-name = "kante"
-version = "0.9.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "channels" },
-    { name = "django" },
-    { name = "strawberry-graphql", extra = ["channels"] },
-    { name = "strawberry-graphql-django" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/6e/1b/3627c53b3a996537957482994add6e36c4d14ce88cdce9dc7c9eca2142b9/kante-0.9.0.tar.gz", hash = "sha256:cefb82d6d7e230ee6b50fbe23dd8843a043b17b95eb42be4d39652b97f32a0b2", size = 9307, upload-time = "2025-05-06T09:33:33.163Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/cf/07/1f7ac673496df044bb68b189778ed084bb70a7e075ab3670836de0a51d53/kante-0.9.0-py3-none-any.whl", hash = "sha256:1430afdeb3247d3bc4d96462046299babc30211a34a2d52fd2f22bc7d0146a88", size = 11858, upload-time = "2025-05-06T09:33:31.876Z" },
-]
-
-[[package]]
-name = "koherent"
-version = "0.2.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "authentikate" },
-    { name = "django" },
-    { name = "django-simple-history" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/a9/a5/a6bf33905ce4389c582da86fd5724ab4556508800308c85018faca35b43a/koherent-0.2.0.tar.gz", hash = "sha256:2904c88fef5a545515da01279bddbd90230bb42292a0cef52d8afe7f400102b8", size = 6825, upload-time = "2025-05-06T12:23:56.097Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3f/ed/1e2cb054985a869f29575d6e9eccae7999168af8b2c7cd50c6ada8ec5a76/koherent-0.2.0-py3-none-any.whl", hash = "sha256:8bf97932074d782843cea67b84075838604ca29679e46a6564dae6edabd148de", size = 8078, upload-time = "2025-05-06T12:23:53.496Z" },
-]
-
-[[package]]
-name = "livekit-api"
-version = "1.0.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "aiohttp" },
-    { name = "livekit-protocol" },
-    { name = "protobuf" },
-    { name = "pyjwt" },
-    { name = "types-protobuf" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/ee/58/19b21a9bf9011a870be0aa7cccf9188f2ae644247d7da8f20935bbb2aa5b/livekit_api-1.0.2.tar.gz", hash = "sha256:5a6726a24761af046bdb4ae32b572d28df728a0e6824805d86783fa94c59574f", size = 14803, upload-time = "2025-04-03T18:17:49.693Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/7b/a3/d7eda9924316fcc0b9287ae671094f241c25fa13bc24f18e9c708e58d6b2/livekit_api-1.0.2-py3-none-any.whl", hash = "sha256:81ea2b330a7182c77f3cf307dfcff7df7d0d70524055bfb02be23ac8a45b8c6a", size = 17251, upload-time = "2025-04-03T18:17:48.44Z" },
-]
-
-[[package]]
-name = "livekit-protocol"
-version = "1.0.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "protobuf" },
-    { name = "types-protobuf" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/6c/eb/a2bac69a6be3ac1f6a2f6f5e64af8d5d91a8734689b4c1d3dc73ff56d38d/livekit_protocol-1.0.2.tar.gz", hash = "sha256:006dd0de6280681d9e38574a76162bfa826e135a10c1107d21abe52bb7026aef", size = 55697, upload-time = "2025-04-12T10:16:51.754Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/73/e9/6575dac25f15566e940a1f8c519848829e7db8c630d000c9eca572cc76b5/livekit_protocol-1.0.2-py3-none-any.whl", hash = "sha256:560b15f4d021f052ff95189d3e124cc0e20e24799e01d08c9183344e7ea91114", size = 65999, upload-time = "2025-04-12T10:16:50.391Z" },
 ]
 
 [[package]]

@@ -1,5 +1,5 @@
 [project]
-name = "kabinet-server"
+name = "lovekit-server"
 version = "0.1.0"
 description = ""
 authors = [{ name = "jhnnsrs", email = "jhnnsrs@gmail.com" }]

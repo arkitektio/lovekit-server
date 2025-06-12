@@ -8,13 +8,13 @@ from bridge import enums, filters, models
 from kante.types import Info
 
 
-@strawberry_django.type(models.Agent, pagination=True)
+@strawberry_django.type(models.Agent, filters=filters.AgentFilter, pagination=True)
 class Agent:
     id: strawberry.ID
 
 
 
-@strawberry_django.type(models.Stream, pagination=True)
+@strawberry_django.type(models.Stream, filters=filters.StreamFilter,  pagination=True)
 class Stream:
     id: strawberry.ID
     agent: Agent
