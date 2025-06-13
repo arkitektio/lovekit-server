@@ -6,52 +6,52 @@ from typing import Any, Dict, List, Tuple
 import strawberry
 import strawberry_django
 from kante.types import Info
-from bridge import types, models, inputs
+from bridge import types, models, inputs, api
 
 logger = logging.getLogger(__name__)
 from django.contrib.auth import get_user_model
-from livekit import api
-from livekit.protocol.room import ListRoomsRequest
+from livekit import api as lapi
 from django.conf import settings
 
 
 
-async def create_video_stream(info: Info, input: inputs.CreateStreamInput) -> types.Stream:
 
 
-    agent, _ = await models.Agent.objects.aget_or_create(
+
+async def ensure_stream(info: Info, input: inputs.EnsureStreamInput) -> str:
+
+
+    streamer, _ = await models.Streamer.objects.aget_or_create(
         user=info.context.request.user,
         client=info.context.request.client,
-        instance_id=input.instance_id,
     )
     
-   
+    
+    broadcast = await models.Broadcast.objects.select_related("solobroadcast__streamer", "collaborativebroadcast").aget(id=input.broadcast)
+    
+    if broadcast.solobroadcast:
+        assert streamer == broadcast.solobroadcast.streamer, "You are not the owner of this solo broadcast."
+        
+    elif broadcast.collaborativebroadcast:
+        assert streamer in await broadcast.collaborative_broadcast.streamers.aall(), "You are not a member of this collaborative broadcast."
+        
+    else:
+        raise ValueError("Broadcast must be either a solo or collaborative broadcast.")
+    
 
-    # Check if room exists.
-
-    print(settings.LIVEKIT)
-
-    lkapi = api.LiveKitAPI(
-        url=settings.LIVEKIT["API_URL"],
-        api_key=settings.LIVEKIT["API_KEY"],
-        api_secret=settings.LIVEKIT["API_SECRET"],
-    )
-
-    room_info = await lkapi.room.create_room(
-        api.CreateRoomRequest(name=agent.streamlit_room_id),
-    )
+    lkapi = api.get_api()
 
     token = (
-        api.AccessToken(
+        lapi.AccessToken(
             api_key=settings.LIVEKIT["API_KEY"],
             api_secret=settings.LIVEKIT["API_SECRET"],
         )
-        .with_identity("agent-" + str(agent.id))
-        .with_name("agent-" + str(agent.id))
+        .with_identity(streamer.streamlit_participant_id)
+        .with_name(streamer.streamlit_participant_id)
         .with_grants(
-            api.VideoGrants(
+            lapi.VideoGrants(
                 room_join=True,
-                room=agent.streamlit_room_id,
+                room=broadcast.streamlit_room_id,
             )
         )
         .to_jwt()
@@ -60,57 +60,42 @@ async def create_video_stream(info: Info, input: inputs.CreateStreamInput) -> ty
     print(token)
 
     stream, _ = await models.Stream.objects.aupdate_or_create(
-        title=input.title or "default", agent=agent, defaults=dict(token=token)
+        title=input.title or "default", broadcast=broadcast, streamer=streamer, kind=input.kind
     )
 
     
-    return stream
+    return token
 
 
-@strawberry.input
-class JoinStreamInput:
-    id: strawberry.ID
 
-
-async def join_video_stream(info: Info, input: JoinStreamInput) -> types.Stream:
+async def join_broadcast(info: Info, input: inputs.JoinBroadcastInput) -> str:
     creator = info.context.request.user
 
 
-    agent, _ = await models.Agent.objects.get(id=id)
+    broadcast = await models.Broadcast.objects.aget(id=input.broadcast)
+    
+    
 
     token = (
-        api.AccessToken()
-        .with_identity(agent.id)
-        .with_name(agent.name)
+        lapi.AccessToken(
+            api_key=settings.LIVEKIT["API_KEY"],
+            api_secret=settings.LIVEKIT["API_SECRET"],
+        )
+        .with_identity("user-" + str(creator.id))
+        .with_name(creator.username)
         .with_grants(
-            api.VideoGrants(
+            lapi.VideoGrants(
                 room_join=True,
-                room=agent.streamlit_room_id,
+                room=broadcast.streamlit_room_id,
+                can_publish=False,
+                can_subscribe=True,
             )
         )
         .to_jwt()
     )
 
-    exp = await models.Stream.objects.acreate(
-        title=input.title or "Untitled", agent=agent, token=token
-    )
-
-    return exp
+    return token
 
 
-@strawberry.input
-class LeaveStreamInput:
-    id: strawberry.ID
-
-
-async def leave_video_stream(info: Info, input: LeaveStreamInput) -> types.Stream:
-
-    exp = await models.Stream.objects.aget(id=input.id)
-
-    i
-
-    await exp.delete()
-
-    return exp
 
 
