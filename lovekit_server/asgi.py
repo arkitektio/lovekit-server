@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/4.2/howto/deployment/asgi/
 
 import os
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "kabinet_server.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "lovekit_server.settings")
 from django.core.asgi import get_asgi_application
 # Initialize Django ASGI application early to ensure the AppRegistry
 # is populated before importing code that may import ORM models.

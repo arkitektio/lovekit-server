@@ -50,6 +50,8 @@ INSTALLED_APPS = [
     "channels",
     "django_probes",
     "bridge",
+    "health_check",
+    "health_check.db",
 ]
 
 
@@ -91,7 +93,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = "kabinet_server.urls"
+ROOT_URLCONF = "lovekit_server.urls"
 
 TEMPLATES = [
     {
@@ -114,8 +116,8 @@ AUTHENTICATION_BACKENDS = (
     "guardian.backends.ObjectPermissionBackend",
 )
 
-WSGI_APPLICATION = "kabinet_server.wsgi.application"
-ASGI_APPLICATION = "kabinet_server.asgi.application"
+WSGI_APPLICATION = "lovekit_server.wsgi.application"
+ASGI_APPLICATION = "lovekit_server.asgi.application"
 
 
 STRAWBERRY_DJANGO = {
