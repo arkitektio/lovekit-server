@@ -129,7 +129,7 @@ wheels = [
 
 [[package]]
 name = "authentikate"
-version = "0.23.0"
+version = "0.30.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "django" },
@@ -138,9 +138,9 @@ dependencies = [
     { name = "kante" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a1/d8/0ddde96250f8974b6e45348478df28f57b30be2032b17134bff369e78d86/authentikate-0.23.0.tar.gz", hash = "sha256:28c3305b3c0804615e91e6cdb1b6d1e135f9195e0a29acfa2754096f0491b248", size = 14592, upload-time = "2025-07-18T14:16:16.496Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4f/3a/594df114a5ea47b6b88105e9e76c49e505462b203e0a9f5b9ffeb9b594cb/authentikate-0.30.0.tar.gz", hash = "sha256:c455f95a044b5020d3e45116564df007b8106edec4e2613d5d8a6d269ac8e6fa", size = 16027, upload-time = "2025-12-05T09:52:35.178Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7e/56/7ecdc90883f6faef1c40888bf0b068667108fc0114564aa4b0fe01f2d7dd/authentikate-0.23.0-py3-none-any.whl", hash = "sha256:3743d148ca15cb7afe41397d1a0f76eef3e1b82b93b8caa388b35a653fa20825", size = 18445, upload-time = "2025-07-18T14:16:15.136Z" },
+    { url = "https://files.pythonhosted.org/packages/39/cf/7aba0a711d4bab0d2ad14314b33414157f5664e4a1edc1b20864d2101968/authentikate-0.30.0-py3-none-any.whl", hash = "sha256:5e88973f4d799ba158bda59cd59109c693531d045ea3b2d7f5a90e3bd0f9353b", size = 21579, upload-time = "2025-12-05T09:52:36.39Z" },
 ]
 
 [[package]]
@@ -574,7 +574,7 @@ wheels = [
 
 [[package]]
 name = "kante"
-version = "0.12.1"
+version = "0.16.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "channels" },
@@ -582,9 +582,9 @@ dependencies = [
     { name = "strawberry-graphql", extra = ["channels"] },
     { name = "strawberry-graphql-django" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a3/dc/bdbb5c6fdfa864ee26481366a0d8c6293e1f99aaf6b0d36d85e588cd701c/kante-0.12.1.tar.gz", hash = "sha256:25840862607743c19a51d9681e9e422151ba13d4bdac14c333a6b32242c8cd20", size = 10331, upload-time = "2025-07-16T17:24:30.789Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4f/4c/a925b8f6a5dfd91c97f3d767698c5196c9a60a0f6dafd71eed9c0aa28a71/kante-0.16.1.tar.gz", hash = "sha256:1a80aaf0ca8db508cd456d39fab4692ab9afc87f6db35bfd5575402fd804d679", size = 12029, upload-time = "2025-10-03T13:56:41.019Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/15/5b/1b913c3b35545a63dba5237f1e987d82772d1e0438c7e3ef689ac150cba2/kante-0.12.1-py3-none-any.whl", hash = "sha256:f32b51294ac7e006bfd9243edaaea5002635adbb33d891e3c604463712afc0e2", size = 13118, upload-time = "2025-07-16T17:24:30.055Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/7f/0be4d039fb4bc43bb7648ad8ae93395961bcfb1592af06ea46e25ffb24b9/kante-0.16.1-py3-none-any.whl", hash = "sha256:9d01c856391be45ee95dbc36bc26db3dc98c249bf06ec0be6c0be616a177e32a", size = 15463, upload-time = "2025-10-03T13:56:40.235Z" },
 ]
 
 [[package]]
@@ -667,7 +667,7 @@ dev = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.11.18" },
     { name = "aioredis", specifier = ">=2.0.1,<3" },
-    { name = "authentikate", specifier = ">=0.23" },
+    { name = "authentikate", specifier = ">=0.30" },
     { name = "boto3", specifier = ">=1.38.9" },
     { name = "channels-redis", specifier = ">=4.1.0,<5" },
     { name = "daphne", specifier = ">=4.0.0,<5" },
