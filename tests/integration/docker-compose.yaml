@@ -1,0 +1,21 @@
+services:
+   db:
+      image: jhnnsrs/daten:dev
+      # Throwaway test DB: trade durability for speed (flush/TRUNCATE per test)
+      command: postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off
+      environment:
+         POSTGRES_MULTIPLE_DATABASES: testdb
+         POSTGRES_PASSWORD: test
+         POSTGRES_USER: test
+      labels:
+         - fakts.service=live.arkitekt.postgres
+      ports:
+        - 5555:5432
+   livekit:
+      # Dev mode ships the well-known devkey/secret keypair (see settings_test.LIVEKIT).
+      image: livekit/livekit-server:latest
+      command: --dev --bind 0.0.0.0
+      # Host port 7780 (not 7880) to avoid clashing with a running arkitekt
+      # deployment that already publishes livekit on 7880.
+      ports:
+         - 7780:7880
