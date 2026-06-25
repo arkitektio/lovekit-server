@@ -45,15 +45,18 @@ async def ensure_collaborative_broadcast(
         user=info.context.request.user,
         client=info.context.request.client,
     )
-    broadcast, _ = await models.CollaborativeBroadcast.objects.aget_or_create(
+    broadcast, created = await models.CollaborativeBroadcast.objects.aget_or_create(
         title=input.title or "Untitled",
-        defaults={"streamers": [streamer]},
     )
-    
+    # M2M fields can't be assigned via aget_or_create(defaults=...); set the
+    # creating streamer as a member after the row exists.
+    if created:
+        await broadcast.streamers.aadd(streamer)
+
     lkapi = api.get_api()
 
     room_info = await lkapi.room.create_room(
-        api.CreateRoomRequest(name=broadcast.streamlit_room_id),
+        CreateRoomRequest(name=broadcast.streamlit_room_id),
     )
 
     return broadcast
