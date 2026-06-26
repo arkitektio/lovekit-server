@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.2 (2026-06-26)
+
+### Features
+
+- With white noise and optimized Dockerfile
+  ([`7f0cf0e`](https://github.com/arkitektio/lovekit-server/commit/7f0cf0e7a2c8c1324e46390ecf07c2a0f27ed4b8))
+
+
 ## v1.0.0-rc.1 (2026-06-25)
 
 ### Bug Fixes
