@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.3 (2026-06-26)
+
+### Features
+
+- Removal of stale migrations
+  ([`d328a0d`](https://github.com/arkitektio/lovekit-server/commit/d328a0dfd1ae3aa5fa85b08099758e4f3039613d))
+
+
 ## v1.0.0-rc.2 (2026-06-26)
 
 ### Features
