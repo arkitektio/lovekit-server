@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.12, <4"
 
 [[package]]
@@ -633,6 +633,19 @@ wheels = [
 ]
 
 [[package]]
+name = "django-polymorphic"
+version = "4.11.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a7/1c/48e4c076942d57ad0d6d5033e396d3efc12bac0b19b248891d858bb3e6fd/django_polymorphic-4.11.5.tar.gz", hash = "sha256:9a6fe66fab12cfe06aac81942d14670c6b0204aebd30ce9fb58fb53213c613eb", size = 61789, upload-time = "2026-06-02T15:51:50.912Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b7/44/efac024b4d818e76bb13e0ea1cfebb86c111fa5a40c0c700c748d6a3d8d8/django_polymorphic-4.11.5-py3-none-any.whl", hash = "sha256:8c65b5c109c057c51e059197b01765dd5e096b3fd393ee3038bffc294681b3be", size = 79095, upload-time = "2026-06-02T15:51:49.371Z" },
+]
+
+[[package]]
 name = "django-probes"
 version = "1.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1029,7 +1042,7 @@ wheels = [
 
 [[package]]
 name = "lovekit-server"
-version = "1.0.0rc1"
+version = "1.0.0rc2"
 source = { virtual = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -1041,6 +1054,7 @@ dependencies = [
     { name = "django" },
     { name = "django-choices-field" },
     { name = "django-health-check" },
+    { name = "django-polymorphic" },
     { name = "django-probes" },
     { name = "django-redis" },
     { name = "jsonpatch" },
@@ -1078,6 +1092,7 @@ requires-dist = [
     { name = "django", specifier = ">=5.2" },
     { name = "django-choices-field", specifier = ">=2.2.2,<3" },
     { name = "django-health-check", specifier = ">=3.20.0" },
+    { name = "django-polymorphic", specifier = ">=4.1.0" },
     { name = "django-probes", specifier = ">=1.7.0,<2" },
     { name = "django-redis", specifier = ">=5.4.0" },
     { name = "jsonpatch", specifier = "~=1.33" },

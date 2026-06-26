@@ -8,9 +8,6 @@ python manage.py migrate
 echo "=> Ensuring Superusers..."
 python manage.py ensureadmin
 
-echo "=> Ensuring Repositories..."
-python manage.py ensurerepos
-
 
 
 # Start the first process

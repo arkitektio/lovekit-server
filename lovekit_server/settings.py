@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "kante",
     "channels",
     "django_probes",
+    "datalayer",
     "bridge",
     "health_check",
     "health_check.db",
@@ -125,7 +126,6 @@ STRAWBERRY_DJANGO = {
 }
 
 
-ENSURED_REPOS = conf.ensured_repos
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 

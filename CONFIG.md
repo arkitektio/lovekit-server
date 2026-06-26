@@ -62,7 +62,7 @@ Every value is also settable from the environment. The nesting is expressed with
 | `django.debug` | `DJANGO__DEBUG` |
 | `livekit.api_secret` | `LIVEKIT__API_SECRET` |
 
-Lists and nested objects (e.g. `authentikate.issuers`, `ensured_repos`) are awkward to
+Lists and nested objects (e.g. `authentikate.issuers`) are awkward to
 express as environment variables — prefer the YAML file for those and use env vars for
 the flat scalars (hosts, ports, passwords, toggles).
 
@@ -171,14 +171,6 @@ present, all three fields are required.
 | `api_key` | `LIVEKIT__API_KEY` | str | **required** | LiveKit API key. |
 | `api_secret` 🔒 | `LIVEKIT__API_SECRET` | str | **required** | LiveKit API secret. |
 | `api_url` | `LIVEKIT__API_URL` | str | **required** | LiveKit server URL. |
-
-### `ensured_repos` — container repos ensured on boot
-
-Top-level list of container repositories cloned/ensured when the service boots.
-
-| Key | Env var | Type | Default | Description |
-|---|---|---|---|---|
-| `ensured_repos` | — (use YAML) | list[str] | `[]` | Container repos cloned/ensured on boot. |
 
 ---
 

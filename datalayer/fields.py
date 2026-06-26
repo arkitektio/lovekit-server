@@ -22,10 +22,29 @@ class StorePathField(models.CharField):
         """Initialize the field with a default max_length of 500."""
         kwargs["max_length"] = kwargs.get("max_length", 500)
         validators = list(kwargs.get("validators", []))
-        validators.append(validate_store_path)
+        if validate_store_path not in validators:
+            validators.append(validate_store_path)
         kwargs["validators"] = validators
 
         super().__init__(*args, **kwargs)
+
+    def deconstruct(self):
+        """Strip the internally-added defaults so migrations stay stable.
+
+        ``__init__`` injects ``validate_store_path`` and a default
+        ``max_length``; without removing them here they would be re-serialized
+        into every migration and re-appended on reconstruction, producing an
+        endless stream of no-op "alter field" migrations.
+        """
+        name, path, args, kwargs = super().deconstruct()
+        validators = [v for v in kwargs.get("validators", []) if v is not validate_store_path]
+        if validators:
+            kwargs["validators"] = validators
+        else:
+            kwargs.pop("validators", None)
+        if kwargs.get("max_length") == 500:
+            del kwargs["max_length"]
+        return name, path, args, kwargs
 
 
 S3Field = StorePathField
