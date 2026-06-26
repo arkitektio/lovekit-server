@@ -25,6 +25,7 @@ dependencies = [
     "semver>=3.0.4",
     "livekit-api>=1.0.2",
     "django-health-check>=3.20.0",
+    "whitenoise>=6.6",
 ]
 
 [dependency-groups]
