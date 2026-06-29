@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.5 (2026-06-29)
+
+### Bug Fixes
+
+- Lock?
+  ([`8a2386f`](https://github.com/arkitektio/lovekit-server/commit/8a2386f6d90c0ef93c9cdf2cc9f4f14d06caf4d5))
+
+
 ## v1.0.0-rc.4 (2026-06-29)
 
 ### Bug Fixes
