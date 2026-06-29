@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.4 (2026-06-29)
+
+### Bug Fixes
+
+- Authentikate update
+  ([`cc3c553`](https://github.com/arkitektio/lovekit-server/commit/cc3c5534cb59fd3ecc041458c760628aed90f528))
+
+
 ## v1.0.0-rc.3 (2026-06-26)
 
 ### Features
