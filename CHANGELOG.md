@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.6 (2026-08-17)
+
+### Bug Fixes
+
+- Datalayer
+  ([`cbf0d66`](https://github.com/arkitektio/lovekit-server/commit/cbf0d6624d1dce436bc21a55058a5dee8db1a18d))
+
+
 ## v1.0.0-rc.5 (2026-06-29)
 
 ### Bug Fixes
