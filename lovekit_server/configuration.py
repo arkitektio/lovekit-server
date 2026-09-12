@@ -85,7 +85,6 @@ class Settings(BaseSettings):
     redis: RedisSettings = Field(description="Redis connection.")
     authentikate: AuthentikateSettings = Field(description="Token-verification config (authentikate).")
     livekit: Optional[LivekitSettings] = Field(default=None, description="Optional LiveKit media server credentials.")
-    ensured_repos: List[str] = Field(default_factory=list, description="Container repos cloned/ensured on boot.")
 
     @classmethod
     def settings_customise_sources(

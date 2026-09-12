@@ -1,7 +1,72 @@
+<!-- Frozen. Releases are tag-only since the move to tag-only semantic-release,
+so this file is no longer generated; entries below stop at the last release that
+predates the switch. Current release notes live on the GitHub Releases page. -->
+
 # CHANGELOG
 
 
-## v1.0.0 (2026-06-25)
+## v1.0.0-rc.9 (2026-09-02)
+
+### Bug Fixes
+
+- Authentikate update
+  ([`96fd102`](https://github.com/arkitektio/lovekit-server/commit/96fd102092293b6e0b8f6d5d502d03f4fc7de83c))
+
+
+## v1.0.0-rc.8 (2026-08-21)
+
+### Bug Fixes
+
+- Authentikate 4
+  ([`09bb2a0`](https://github.com/arkitektio/lovekit-server/commit/09bb2a01f538ac7e4b3cfac71a7263008bf1bfc5))
+
+
+## v1.0.0-rc.7 (2026-08-20)
+
+### Bug Fixes
+
+- Authentikate updates
+  ([`03949b7`](https://github.com/arkitektio/lovekit-server/commit/03949b70276f4e3796bb34d2c7fe58a032b77121))
+
+
+## v1.0.0-rc.6 (2026-08-17)
+
+### Bug Fixes
+
+- Datalayer
+  ([`cbf0d66`](https://github.com/arkitektio/lovekit-server/commit/cbf0d6624d1dce436bc21a55058a5dee8db1a18d))
+
+
+## v1.0.0-rc.5 (2026-06-29)
+
+### Bug Fixes
+
+- Lock?
+  ([`8a2386f`](https://github.com/arkitektio/lovekit-server/commit/8a2386f6d90c0ef93c9cdf2cc9f4f14d06caf4d5))
+
+
+## v1.0.0-rc.4 (2026-06-29)
+
+### Bug Fixes
+
+- Authentikate update
+  ([`cc3c553`](https://github.com/arkitektio/lovekit-server/commit/cc3c5534cb59fd3ecc041458c760628aed90f528))
+
+
+## v1.0.0-rc.3 (2026-06-26)
+
+### Features
+
+- Removal of stale migrations
+  ([`d328a0d`](https://github.com/arkitektio/lovekit-server/commit/d328a0dfd1ae3aa5fa85b08099758e4f3039613d))
+
+
+## v1.0.0-rc.2 (2026-06-26)
+
+### Features
+
+- With white noise and optimized Dockerfile
+  ([`7f0cf0e`](https://github.com/arkitektio/lovekit-server/commit/7f0cf0e7a2c8c1324e46390ecf07c2a0f27ed4b8))
 
 
 ## v1.0.0-rc.1 (2026-06-25)
