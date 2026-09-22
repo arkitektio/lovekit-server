@@ -215,7 +215,7 @@ class Datalayer:
         bucket_name, prefix = self._parse_s3_path(path)
         metadata_key = prefix.rstrip("/") + "/zarr.json"
 
-        print(f"Fetching Zarr metadata from bucket '{bucket_name}' with key '{metadata_key}'")
+        logger.debug("Fetching Zarr metadata from bucket %r with key %r", bucket_name, metadata_key)
         try:
             zarr_file = self._s3.get_object(Bucket=bucket_name, Key=metadata_key)
         except Exception as exc:

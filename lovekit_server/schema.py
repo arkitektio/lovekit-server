@@ -1,4 +1,5 @@
 import strawberry
+from lovekit_server.logs import QuietErrorsSchema
 from strawberry_django.optimizer import DjangoOptimizerExtension
 from bridge import types, models
 from bridge.graphql import mutations, subscriptions
@@ -67,7 +68,11 @@ class Subscription:
     )
 
 
-schema = kante.Schema(
+class Schema(QuietErrorsSchema, kante.Schema):
+    """kante.Schema, logging expected resolver errors as one line and bugs with a traceback (see logs.py)."""
+
+
+schema = Schema(
     query=Query,
     mutation=Mutation,
     subscription=Subscription,

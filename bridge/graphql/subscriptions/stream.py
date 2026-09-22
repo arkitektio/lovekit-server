@@ -1,9 +1,12 @@
+import logging
 from typing import AsyncGenerator
 
 import strawberry
 import strawberry_django
 from kante.types import Info
 from bridge import models, scalars, types, channels
+
+logger = logging.getLogger(__name__)
 
 
 @strawberry.type
@@ -29,7 +32,7 @@ async def streams(
 
 
     async for message in channels.stream_channel.listen(info.context, schannels):
-        print("Received message", message)
+        logger.debug("Stream channel message: %s", message)
         if message["type"] == "create":
             roi = await models.File.objects.aget(
                 id=message["id"]

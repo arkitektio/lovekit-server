@@ -57,8 +57,6 @@ async def ensure_stream(info: Info, input: inputs.EnsureStreamInput) -> str:
         .to_jwt()
     )
 
-    print(token)
-
     stream, _ = await models.Stream.objects.aupdate_or_create(
         title=input.title or "default", broadcast=broadcast, streamer=streamer, kind=input.kind
     )
