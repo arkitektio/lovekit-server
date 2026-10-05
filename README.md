@@ -1,35 +1,82 @@
-# Kabinet-Server
+# lovekit-server
 
-## Develompent
+The live video and audio service of an [Arkitekt](https://arkitekt.live) hub. It maps the
+hub's users and apps onto rooms of a [LiveKit](https://livekit.io) server and hands out the
+tokens to join them. It carries no media itself: once a client holds a token, it talks to
+LiveKit directly. It is registered as `live.arkitekt.lovekit` and has a python client,
+[`lovekit`](https://github.com/jhnnsrs/lovekit).
 
-Kabinet is a GraphQL API that allows you to retrieve and save containers
-Arkitekt App). It is designed to be
-used with Arkitekt Apps that are running in these containers, but can be used for any containerized application 
+## What it stores
 
-This is a highly developmental service, that aims to replace Port in the Arkitekt Next Deployment. It is not yet ready for production.
+| Concept | What it is |
+| --- | --- |
+| `Streamer` | An app instance of a user that publishes: the client, the user, and the instance id. |
+| `SoloBroadcast` | A titled broadcast with one streamer. A title is unique per streamer. |
+| `CollaborativeBroadcast` | A titled broadcast several streamers publish into. A title is unique. |
+| `Stream` | One track a streamer publishes into a broadcast: its kind and title. |
 
-## Usage
+Each broadcast is one LiveKit room, named `broadcast-<id>`. A streamer joins as the
+participant `streamer-<id>`, a viewer as `user-<id>`.
 
-Most likely you will use a client library to interact with Kabinet, but you can also use the GraphQL API directly.
-THe API is build along the following concepts:
+## API
 
-Repo: Repos are a collection of Versioned Releases of Apps that may exist in multiple versions. Repos provide ways
-of finding and maintaining (updating) Apps.
+GraphQL is served at `/graphql` (HTTP and WebSocket), with the SDL at `/schema`.
 
-App: An App is Piece of Software that implements a certain functionality. Think: "Napari", "Fiji", "Stardist"
+| Operations | What they do |
+| --- | --- |
+| `ensureSoloBroadcast`, `ensureCollaborativeBroadcast` | Get or create the broadcast, and create its room on LiveKit. |
+| `ensureStream` | Get or create a stream in a broadcast, and return a LiveKit token that may join the room and publish. |
+| `joinBroadcast` | Return a LiveKit token that may join the room and subscribe, but not publish. |
+| `streams`, `soloBroadcasts`, `collaborativeBroadcasts` (and one by id) | The stored rows. |
+| `streams` (subscription) | Stream updates as they happen. |
 
-Release: A Release is a specific version of an App. Releases represent the functionality of an App at a certain point
-in time. Arkitekt Apps are always released with a version number that follows the [Semantic Versioning](https://semver.org/) standard.
-Think: "Napari 0.4.10", "Fiji 1.53c", "Stardist 0.1.0"
+## Hub integration
 
-Flavour: A Flavour is a specific configuration of an App. Flavours are used to provide different configurations of Apps, where the
-core functionality is the same, but the configuration is different. Think: "Napari 0.4.10 on Python 3.8", "Fiji 1.53c with OpenJDK 11", 
-"Stardist 0.1.0 with CUDA 10.2" or "Stardist 0.1.0 on the CPU"
+Declared in [`lovekit_server/contract.py`](lovekit_server/contract.py):
 
-Deployment: A Setup is the "Intent" to run a certain Release of an App (e.g. "Napari 0.4.10"), with specific access rights and identified by
-a user. Thinks: "Napari 0.4.10 on Python 3.8 authorized as John Doe and able to access all his files", on a specific backend.
+- **Needs**: the `livekit` peer, whose URL, API key and API secret the contract writes into
+  the `livekit` config block; `media` storage; tokens issued by lok.
 
-Pod: A Pod is a running instance of a Setup. Pods are the actual running containers that provide the functionality of an App. They
-are the only model that is actively maintained by the Backend. Pods are identified by a container specific ID and are always associated with a Setup.
+It defines no scopes or roles of its own, does not register with rekuest and offers no
+actions.
 
+## Running
 
+The image is `jhnnsrs/lovekit`. It has no default command, and starting it takes two steps:
+
+```sh
+python -m arkitekt_service migrate   # wait for the database, apply migrations
+bash run.sh                          # serve on :80 (daphne), and nothing else
+```
+
+It needs Postgres, Redis and a LiveKit server it can reach with an API key and secret.
+
+## Configuration
+
+The service reads `config.yaml`, or the file named by `ARKITEKT_CONFIG_FILE`; any value can
+be overridden by an environment variable (`POSTGRES__HOST`). `python manage.py
+validate_settings` prints the configuration as the service reads it, with secrets redacted.
+
+See [CONFIG.md](CONFIG.md) for every value.
+
+## Development
+
+```sh
+uv sync
+uv run pytest
+```
+
+The suite runs against a real stack, brought up by [dokker](https://github.com/jhnnsrs/dokker)
+from `tests/integration/docker-compose.yaml`: Postgres (`jhnnsrs/daten:next`) and a LiveKit
+server in dev mode. It needs a running Docker daemon, and the host ports 5555 and 7780 free:
+unlike the other services' suites, this stack pins its ports, so two runs cannot share a
+machine.
+
+## Releases
+
+Releases are tags: a push to `main` cuts a stable version, a push to `next` a release
+candidate. Each one publishes `jhnnsrs/lovekit` under its version (`X.Y.Z`, `X.Y`, `X`),
+plus `latest` from `main` and `next` from `next`. The `version` in `pyproject.toml` is a
+placeholder. Release notes are on
+[GitHub Releases](https://github.com/arkitektio/lovekit-server/releases); `CHANGELOG.md` is
+frozen.
