@@ -20,7 +20,7 @@ ENV PYTHONUNBUFFERED=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
     VIRTUAL_ENV=/opt/venv \
     PATH="/opt/venv/bin:$PATH" \
-    HUB_CONTRACT=lovekit_server.contract
+    ARKITEKT_SERVICE=lovekit_server.contract
 WORKDIR /workspace
 COPY --from=builder /opt/venv /opt/venv
 COPY . .
