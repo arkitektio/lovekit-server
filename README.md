@@ -45,8 +45,8 @@ actions.
 The image is `jhnnsrs/lovekit`. It has no default command, and starting it takes two steps:
 
 ```sh
-python -m arkitekt_service migrate   # wait for the database, apply migrations
-bash run.sh                          # serve on :80 (daphne), and nothing else
+arkitekt-service run migrate   # wait for the database, apply migrations
+arkitekt-service serve                          # serve on :80 (daphne), and nothing else
 ```
 
 It needs Postgres, Redis and a LiveKit server it can reach with an API key and secret.

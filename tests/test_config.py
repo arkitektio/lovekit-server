@@ -3,7 +3,10 @@
 Standalone — needs no database; run with ``uv run pytest tests/test_config.py``.
 """
 
-from lovekit_server.configuration import Settings, unread
+from arkitekt_service.contract.unread import unread
+from arkitekt_service.server.settings import written
+
+from lovekit_server.configuration import Settings
 
 
 def test_config_yaml_validates():
@@ -21,11 +24,11 @@ def test_env_override(monkeypatch):
 
 def test_the_services_own_config_is_read_as_written():
     """Nothing in the repo's config.yaml goes unread."""
-    assert not unread()
+    assert not unread(Settings, written())
 
 
 def test_an_unknown_key_in_a_block_of_this_service_is_reported():
     """A key no setting claims is said, where the block is this service's and closed."""
-    found = unread({"django": {"secret_key": "s", "debgu": True}, "postgres": {"sslmode": "require"}, "somebody_elses": {"x": 1}})
+    found = unread(Settings, {"django": {"secret_key": "s", "debgu": True}, "postgres": {"sslmode": "require"}, "somebody_elses": {"x": 1}})
     assert found.unknown == ["django.debgu"]
     assert found.renamed == []
