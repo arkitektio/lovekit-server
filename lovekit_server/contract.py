@@ -7,7 +7,7 @@ the same commit, and no installer has to learn of it.
 
 from __future__ import annotations
 
-from arkitekt_service.contract import JSON, Contract, Description, Facts, Needs, Offers, Start, blocks
+from arkitekt_service.contract import JSON, Contract, Description, Facts, Job, Needs, Offers, Start, blocks
 
 from lovekit_server.configuration import Settings
 
@@ -35,4 +35,8 @@ contract = Contract(
     # (and `debug`) become these, so they get the container's signals themselves.
     serve=Start(("daphne", "-b", "0.0.0.0", "-p", "80", "--websocket_timeout", "-1", "lovekit_server.asgi:application")),
     debug=Start(("python", "manage.py", "runserver", "0.0.0.0:80")),
+    jobs={
+        "ensureadmin": Job(("ensureadmin",), "Create the operator account the config names"),
+    },
+    setup=("ensureadmin",),
 )
