@@ -4,7 +4,7 @@ import uuid
 from django.conf import settings
 
 from typing import List
-from authentikate.models import Client, User
+from authentikate.models import Client, User, Organization
 
 
 
@@ -106,5 +106,80 @@ class Stream(models.Model):
         
     
     
+
+
+
+class Structure(models.Model):
+    """A reference to an object on another service, the thing a call is about.
+
+    The same contract as alpaka's rooms: ``identifier`` names the model
+    (``@mikro/image``), ``object`` is its id on that service.
+    """
+
+    identifier = models.CharField(
+        max_length=1000,
+        help_text="The identifier of the object. Consult the documentation for the format",
+    )
+    object = models.PositiveIntegerField(help_text="The object id of the object, on its associated service")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["identifier", "object"], name="Unique structure per identifier and object")
+        ]
+
+
+class Call(models.Model):
+    """A multi-party LiveKit room about some structures.
+
+    One call is one LiveKit room (``livekit_room_name``). Everyone in the
+    call's organization may join; whether it is live is LiveKit's answer
+    (the room exists while someone is in it), not a column here.
+    """
+
+    title = models.CharField(max_length=1000, help_text="The title of the call")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="calls",
+        help_text="The organization this call belongs to",
+    )
+    creator = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_calls",
+        help_text="The user that started this call",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, help_text="The time this call was started")
+    about = models.ManyToManyField(
+        Structure,
+        related_name="calls",
+        blank=True,
+        help_text="The structures this call is about",
+    )
+
+    @property
+    def livekit_room_name(self) -> str:
+        """The LiveKit room every participant of this call joins."""
+        return f"call-{self.id}"
+
+
+
+class CallInvite(models.Model):
+    """Someone asking someone else into a call: the invitation their app rings with.
+
+    An invite is pending until the invitee dismisses it or joins the call
+    (from any device), and moot once the call's room is gone. Nothing here
+    reaches a phone: it is delivered to the apps the invitee has open, through
+    the `callInvites` subscription.
+    """
+
+    call = models.ForeignKey(Call, on_delete=models.CASCADE, related_name="invites")
+    inviter = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_call_invites")
+    invitee = models.ForeignKey(User, on_delete=models.CASCADE, related_name="call_invites")
+    created_at = models.DateTimeField(auto_now_add=True)
+    dismissed_at = models.DateTimeField(null=True, blank=True)
+
 
 from .signals import * 

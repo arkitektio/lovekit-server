@@ -36,6 +36,9 @@ AUTHENTIKATE = {
         # AuthentikateExtension re-resolves the user from the Bearer token at
         # resolve time, so a different *user* requires a different *token*.
         "othertest": {"sub": "9"},
+        # The same second user acting in ANOTHER organization, for tenant
+        # scoping tests: a call of static_org must not exist for them.
+        "stranger": {"sub": "9", "org": "another_org"},
     },
 }
 
