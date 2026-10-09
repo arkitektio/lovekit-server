@@ -80,7 +80,9 @@ async def join_call(info: Info, input: inputs.JoinCallInput) -> str:
     Scoped first: a call of another organization does not exist for this
     caller. The identity carries a nonce so a second window of the same user
     joins beside the first instead of replacing it; the name and metadata
-    are what the others see and group by.
+    are what the others see and group by. The name is the token's
+    preferred username (authentikate keeps it on ``first_name``); ``username``
+    is the issuer-and-sub artifact, not what anyone calls the user.
     """
     user = info.context.request.user
     call = await models.Call.objects.aget(id=input.call, organization=info.context.request.organization)
@@ -94,7 +96,7 @@ async def join_call(info: Info, input: inputs.JoinCallInput) -> str:
             api_secret=settings.LIVEKIT["API_SECRET"],
         )
         .with_identity(f"user-{user.id}-{secrets.token_hex(3)}")
-        .with_name(user.username)
+        .with_name(user.first_name or user.username)
         .with_metadata(json.dumps({"user": user.id, "sub": user.sub}))
         .with_grants(
             lapi.VideoGrants(

@@ -90,7 +90,12 @@ async def test_join_call_mints_a_publishing_token_for_the_room(aexecute):
     assert claims["video"]["canPublish"] is True
     assert claims["video"]["canSubscribe"] is True
     assert claims["sub"].startswith("user-")
-    assert claims["name"] == "static_issuer_1"
+    # What the others see: the preferred username, never the iss_sub artifact.
+    from authentikate.models import User
+
+    user = await User.objects.aget(sub="1")
+    assert claims["name"] == (user.first_name or user.username)
+    assert claims["name"] != "static_issuer_1" or not user.first_name
 
 
 async def test_join_call_twice_gives_two_identities(aexecute):
