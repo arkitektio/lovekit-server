@@ -13,3 +13,10 @@ class CallInviteSignal(BaseModel):
 
     create: int | None = Field(None, description="The invite that was created.")
     delete: int | None = Field(None, description="The invite that was dismissed, answered, or whose call ended.")
+
+
+class CallSignal(BaseModel):
+    """A call starting in an organization, or changing what it is about."""
+
+    create: int | None = Field(None, description="The call that was started.")
+    update: int | None = Field(None, description="The call that turned to something else to be about.")

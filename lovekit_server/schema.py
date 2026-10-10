@@ -79,6 +79,7 @@ class Mutation:
 
     # Calls: multi-party rooms about structures
     ensure_call: types.Call = strawberry_django.field(resolver=mutations.ensure_call, description="The live call about these structures, or a new one")
+    add_to_call: types.Call = strawberry_django.field(resolver=mutations.add_to_call, description="Turn a call to these structures: they become what it is about last, and what it was about stays")
     join_call: str = strawberry_django.field(resolver=mutations.join_call, description="Join a call and return the token for it")
     invite_to_call: types.Call = strawberry_django.field(resolver=mutations.invite_to_call, description="Ask users into a call; their open apps ring")
     dismiss_call_invite: strawberry.ID = strawberry_django.field(resolver=mutations.dismiss_call_invite, description="Put an invitation away, on every device")
@@ -95,6 +96,10 @@ class Subscription:
     call_invites = strawberry.subscription(
         resolver=subscriptions.call_invites,
         description="Your invitations to calls as they arrive and go away",
+    )
+    calls = strawberry.subscription(
+        resolver=subscriptions.calls,
+        description="The calls others start in your organization as they start, and any call's new topics",
     )
 
 

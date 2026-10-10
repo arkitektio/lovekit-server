@@ -52,6 +52,11 @@ async def live_room_names() -> set[str]:
         await client.aclose()
 
 
+def call_ids(room_names: set[str]) -> list[int]:
+    """The calls these LiveKit rooms belong to (a call's room is ``call-<id>``)."""
+    return [int(name[5:]) for name in room_names if name.startswith("call-") and name[5:].isdigit()]
+
+
 async def participants(room_name: str) -> list[Participant]:
     """Who is in ``room_name`` now; nobody when the room does not exist."""
     client = api.get_api()

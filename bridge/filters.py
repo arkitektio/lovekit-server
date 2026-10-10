@@ -107,6 +107,6 @@ class CallFilter:
         # The queryset is built in a worker thread, so LiveKit is asked
         # synchronously; one request answers for every call in the list.
         names = async_to_sync(calls.live_room_names)()
-        ids = [int(name.removeprefix("call-")) for name in names if name.startswith("call-") and name[5:].isdigit()]
+        ids = calls.call_ids(names)
         predicate = Q(**{f"{prefix}id__in": ids})
         return queryset, (predicate if value else ~predicate)

@@ -145,3 +145,105 @@ async def test_calls_are_scoped_to_the_organization(aexecute, authenticated_cont
 
     joined = await aexecute(JOIN_CALL, {"input": {"call": call_id}}, context=stranger)
     assert joined.errors
+
+
+ADD_TO_CALL = """
+mutation ($input: AddToCallInput!) {
+  addToCall(input: $input) { id title about { identifier object } }
+}
+"""
+
+OTHER_IMAGE = {"identifier": "@mikro/image", "object": 43}
+
+
+def _about(call) -> list[tuple[str, int]]:
+    """What the call is about, in the order it reports: oldest first."""
+    return [(structure["identifier"], structure["object"]) for structure in call["about"]]
+
+
+async def test_add_to_call_keeps_what_the_call_was_about(aexecute):
+    created = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE], "title": "Look at this"}})
+    call_id = created.data["ensureCall"]["id"]
+
+    res = await aexecute(ADD_TO_CALL, {"input": {"call": call_id, "about": [OTHER_IMAGE]}})
+    assert not res.errors, res.errors
+    assert _about(res.data["addToCall"]) == [("@mikro/image", 42), ("@mikro/image", 43)]
+    assert res.data["addToCall"]["title"] == "Look at this"
+
+    # Adding what it is already about changes nothing.
+    again = await aexecute(ADD_TO_CALL, {"input": {"call": call_id, "about": [IMAGE, OTHER_IMAGE]}})
+    assert _about(again.data["addToCall"]) == [("@mikro/image", 42), ("@mikro/image", 43)]
+
+
+async def test_adding_an_earlier_topic_again_turns_the_call_back_to_it(aexecute):
+    created = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
+    call_id = created.data["ensureCall"]["id"]
+    await aexecute(ADD_TO_CALL, {"input": {"call": call_id, "about": [OTHER_IMAGE]}})
+
+    back = await aexecute(ADD_TO_CALL, {"input": {"call": call_id, "about": [IMAGE]}})
+    assert not back.errors, back.errors
+    # Nothing lost, and the image is the current topic again.
+    assert _about(back.data["addToCall"]) == [("@mikro/image", 43), ("@mikro/image", 42)]
+
+
+async def test_what_a_call_is_about_comes_in_the_order_it_was_added(aexecute):
+    """The last one is the current topic, whatever was first called about elsewhere."""
+    # Image 43 exists as a structure before image 42 does.
+    await aexecute(ENSURE_CALL, {"input": {"about": [OTHER_IMAGE]}})
+    created = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
+    call_id = created.data["ensureCall"]["id"]
+
+    await aexecute(ADD_TO_CALL, {"input": {"call": call_id, "about": [{"identifier": "@kraph/entity", "object": 5}, OTHER_IMAGE]}})
+    read = await aexecute("query ($id: ID!) { call(id: $id) { about { identifier object } } }", {"id": call_id})
+    assert not read.errors, read.errors
+    assert _about(read.data["call"]) == [("@mikro/image", 42), ("@kraph/entity", 5), ("@mikro/image", 43)]
+
+    listed = await aexecute(CALLS_ABOUT.replace("participantCount", "about { identifier object }"), {"about": IMAGE, "live": True})
+    assert not listed.errors, listed.errors
+    assert _about(listed.data["calls"][0]) == [("@mikro/image", 42), ("@kraph/entity", 5), ("@mikro/image", 43)]
+
+
+async def test_a_call_with_a_new_topic_is_still_the_call_about_its_first(aexecute):
+    created = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
+    call_id = created.data["ensureCall"]["id"]
+    await aexecute(ADD_TO_CALL, {"input": {"call": call_id, "about": [OTHER_IMAGE]}})
+
+    # "Call about this" on either image lands in the room, not beside it.
+    first = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
+    added = await aexecute(ENSURE_CALL, {"input": {"about": [OTHER_IMAGE]}})
+    assert first.data["ensureCall"]["id"] == call_id
+    assert added.data["ensureCall"]["id"] == call_id
+
+    listed = await aexecute(CALLS_ABOUT, {"about": OTHER_IMAGE, "live": True})
+    assert [c["id"] for c in listed.data["calls"]] == [call_id]
+
+
+async def test_the_call_about_exactly_this_wins_over_one_about_more(aexecute):
+    wide = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE, OTHER_IMAGE]}})
+    narrow = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
+    # No call was about the image alone, but one was about it: reused.
+    assert narrow.data["ensureCall"]["id"] == wide.data["ensureCall"]["id"]
+
+    alone = await aexecute(ENSURE_CALL, {"input": {"about": [{"identifier": "@mikro/image", "object": 44}]}})
+    await aexecute(ADD_TO_CALL, {"input": {"call": wide.data["ensureCall"]["id"], "about": [{"identifier": "@mikro/image", "object": 44}]}})
+    again = await aexecute(ENSURE_CALL, {"input": {"about": [{"identifier": "@mikro/image", "object": 44}]}})
+    assert again.data["ensureCall"]["id"] == alone.data["ensureCall"]["id"]
+
+
+async def test_add_to_call_needs_something_and_a_call_of_ones_own_organization(aexecute):
+    from asgiref.sync import sync_to_async
+
+    from tests.conftest import _make_context
+
+    created = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
+    call_id = created.data["ensureCall"]["id"]
+
+    nothing = await aexecute(ADD_TO_CALL, {"input": {"call": call_id, "about": []}})
+    assert nothing.errors
+
+    stranger = await sync_to_async(_make_context)(
+        token="stranger", sub="9", username="static_issuer_9", org_slug="another_org"
+    )
+    theirs = await aexecute(ADD_TO_CALL, {"input": {"call": call_id, "about": [OTHER_IMAGE]}}, context=stranger)
+    assert theirs.errors
+    assert await Call.objects.filter(id=call_id, about__object=43).acount() == 0

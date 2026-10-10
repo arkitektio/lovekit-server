@@ -48,6 +48,14 @@ class EnsureCallInput:
     title: str | None = None
 
 
+@strawberry.input(description="What a call is now also about")
+class AddToCallInput:
+    """The call, and the structures to add to what it is about."""
+
+    call: strawberry.ID
+    about: list[StructureInput]
+
+
 @strawberry.input(description="The call to join")
 class JoinCallInput:
     call: strawberry.ID

@@ -97,7 +97,14 @@ class Call:
     title: str
     created_at: datetime.datetime
     creator: Optional[User]
-    about: List[Structure] = strawberry_django.field(description="The structures this call is about.")
+
+    @strawberry_django.field(description="The structures this call is about, oldest first: the last one is what it turned to most recently.")
+    def about(self) -> List[Structure]:
+        # In the order they were added, which only the link rows know: the
+        # relation itself has no order, and a structure's own id says when
+        # anything was first called about, not when this call took it on.
+        links = models.Call.about.through.objects.filter(call_id=self.id).select_related("structure").order_by("id")
+        return [link.structure for link in links]
 
     @strawberry.field(description="The LiveKit room this call's participants join.")
     def room_name(self) -> str:
