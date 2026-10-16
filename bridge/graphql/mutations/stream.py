@@ -6,12 +6,10 @@ from typing import Any, Dict, List, Tuple
 import strawberry
 import strawberry_django
 from kante.types import Info
-from bridge import types, models, inputs, api
+from bridge import types, models, inputs, tokens
 
 logger = logging.getLogger(__name__)
 from django.contrib.auth import get_user_model
-from livekit import api as lapi
-from django.conf import settings
 
 
 
@@ -39,30 +37,21 @@ async def ensure_stream(info: Info, input: inputs.EnsureStreamInput) -> str:
         raise ValueError("Broadcast must be either a solo or collaborative broadcast.")
     
 
-    lkapi = api.get_api()
-
-    token = (
-        lapi.AccessToken(
-            api_key=settings.LIVEKIT["API_KEY"],
-            api_secret=settings.LIVEKIT["API_SECRET"],
-        )
-        .with_identity(streamer.streamlit_participant_id)
-        .with_name(streamer.streamlit_participant_id)
-        .with_grants(
-            lapi.VideoGrants(
-                room_join=True,
-                room=broadcast.streamlit_room_id,
-            )
-        )
-        .to_jwt()
-    )
-
     stream, _ = await models.Stream.objects.aupdate_or_create(
         title=input.title or "default", broadcast=broadcast, streamer=streamer, kind=input.kind
     )
 
-    
-    return token
+    # Its own identity per token: a second connection of this client (another
+    # process, a reconnect) publishes beside the first instead of replacing it.
+    return tokens.participant_token(
+        broadcast.streamlit_room_id,
+        kind="streamer",
+        id=streamer.id,
+        user=info.context.request.user,
+        can_publish=True,
+        can_publish_data=True,
+        metadata={"streamer": streamer.id},
+    )
 
 
 
@@ -74,25 +63,15 @@ async def join_broadcast(info: Info, input: inputs.JoinBroadcastInput) -> str:
     
     
 
-    token = (
-        lapi.AccessToken(
-            api_key=settings.LIVEKIT["API_KEY"],
-            api_secret=settings.LIVEKIT["API_SECRET"],
-        )
-        .with_identity("user-" + str(creator.id))
-        .with_name(creator.username)
-        .with_grants(
-            lapi.VideoGrants(
-                room_join=True,
-                room=broadcast.streamlit_room_id,
-                can_publish=False,
-                can_subscribe=True,
-            )
-        )
-        .to_jwt()
+    # Its own identity per token: the same user watching in a second window
+    # or on a second device joins beside the first instead of kicking it out.
+    return tokens.participant_token(
+        broadcast.streamlit_room_id,
+        kind="user",
+        id=creator.id,
+        user=creator,
+        can_publish=False,
     )
-
-    return token
 
 
 

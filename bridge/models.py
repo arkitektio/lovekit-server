@@ -64,14 +64,7 @@ class Streamer(models.Model):
         related_name="streamers",
         help_text="The user that created this comment",
     )
-    
-    @property
-    def streamlit_participant_id(self) -> str:
-        """
-        Returns the room ID for this agent. All streams created by this agent will use this room ID.
-        """
-        return f"streamer-{self.id}"
- 
+
 
 
 

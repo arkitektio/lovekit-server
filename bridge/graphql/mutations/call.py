@@ -9,16 +9,12 @@ keeping what it was about before (the last one is its current topic). ``joinCall
 lets the caller publish and subscribe in that room.
 """
 
-import json
 import logging
-import secrets
 
 from asgiref.sync import sync_to_async
 from kante.types import Info
-from livekit import api as lapi
-from django.conf import settings
 
-from bridge import calls, inputs, models, types
+from bridge import calls, inputs, models, tokens, types
 from bridge.channel_signals import CallSignal
 from bridge.channels import call_channel
 from bridge.graphql.mutations.invite import clear_invites_on_join
@@ -147,22 +143,11 @@ async def join_call(info: Info, input: inputs.JoinCallInput) -> str:
     # Answered: the invitation stops ringing on the user's other devices too.
     await clear_invites_on_join(info, call)
 
-    return (
-        lapi.AccessToken(
-            api_key=settings.LIVEKIT["API_KEY"],
-            api_secret=settings.LIVEKIT["API_SECRET"],
-        )
-        .with_identity(f"user-{user.id}-{secrets.token_hex(3)}")
-        .with_name(user.first_name or user.username)
-        .with_metadata(json.dumps({"user": user.id, "sub": user.sub}))
-        .with_grants(
-            lapi.VideoGrants(
-                room_join=True,
-                room=call.livekit_room_name,
-                can_publish=True,
-                can_subscribe=True,
-                can_publish_data=True,
-            )
-        )
-        .to_jwt()
+    return tokens.participant_token(
+        call.livekit_room_name,
+        kind="user",
+        id=user.id,
+        user=user,
+        can_publish=True,
+        can_publish_data=True,
     )

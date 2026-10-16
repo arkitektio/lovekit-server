@@ -88,3 +88,42 @@ async def test_join_broadcast_returns_viewer_token(aexecute):
     assert claims.video.can_publish is False
     assert claims.video.can_subscribe is True
     assert claims.identity.startswith("user-")
+
+
+async def test_join_broadcast_twice_gives_two_identities(aexecute):
+    bid = await _make_solo_broadcast(aexecute)
+    first = await aexecute(JOIN_BROADCAST, {"input": {"broadcast": bid}})
+    second = await aexecute(JOIN_BROADCAST, {"input": {"broadcast": bid}})
+
+    # A second window of the same user watches beside the first instead of kicking it out.
+    a, b = _verify(first.data["joinBroadcast"]), _verify(second.data["joinBroadcast"])
+    assert a.identity != b.identity
+    assert a.identity.startswith("user-") and b.identity.startswith("user-")
+
+
+async def test_ensure_stream_twice_gives_two_identities(aexecute):
+    bid = await _make_solo_broadcast(aexecute)
+    first = await aexecute(ENSURE_STREAM, {"input": {"broadcast": bid, "title": "a"}})
+    second = await aexecute(ENSURE_STREAM, {"input": {"broadcast": bid, "title": "b"}})
+
+    # Two connections of one client publish side by side; the apps still find
+    # streamers by the "streamer" prefix.
+    a, b = _verify(first.data["ensureStream"]), _verify(second.data["ensureStream"])
+    assert a.identity != b.identity
+    assert a.identity.startswith("streamer-") and b.identity.startswith("streamer-")
+
+
+async def test_stream_and_viewer_tokens_name_the_user(aexecute, authenticated_context):
+    from django.contrib.auth import get_user_model
+    import json
+
+    bid = await _make_solo_broadcast(aexecute)
+    stream = _verify((await aexecute(ENSURE_STREAM, {"input": {"broadcast": bid}})).data["ensureStream"])
+    viewer = _verify((await aexecute(JOIN_BROADCAST, {"input": {"broadcast": bid}})).data["joinBroadcast"])
+
+    user = await get_user_model().objects.aget(sub="1")
+    # What the others see is the preferred username, like a call participant.
+    assert stream.name == viewer.name == (user.first_name or user.username)
+    assert json.loads(viewer.metadata) == {"user": user.id, "sub": user.sub}
+    assert json.loads(stream.metadata)["user"] == user.id
+    assert "streamer" in json.loads(stream.metadata)
