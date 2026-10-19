@@ -5,6 +5,7 @@ import strawberry
 import strawberry_django
 from asgiref.sync import sync_to_async
 import kante
+from arkitekt_service.collaborations.guests import object_scope
 from authentikate.strawberry.types import Client, User
 from bridge import calls, enums, filters, models, streams
 from kante.types import Info
@@ -34,8 +35,9 @@ def _agent_room(agent_id: int) -> tuple[str, str]:
 class Agent:
     @classmethod
     def get_queryset(cls, queryset, info, **kwargs):
-        """Restrict every read of this type to the request's organization."""
-        return queryset.filter(organization=info.context.request.organization)
+        """Restrict every read of this type to the request's organization; at a root field, a
+        guest's to what is in their collaborations."""
+        return object_scope(queryset.filter(organization=info.context.request.organization), info=info)
 
     id: strawberry.ID
     client: Client
@@ -60,8 +62,9 @@ class Agent:
 class Stream:
     @classmethod
     def get_queryset(cls, queryset, info, **kwargs):
-        """Restrict every read of this type to the request's organization."""
-        return queryset.filter(agent__organization=info.context.request.organization)
+        """Restrict every read of this type to the request's organization; at a root field, a
+        guest's to what is in their collaborations."""
+        return object_scope(queryset.filter(agent__organization=info.context.request.organization), info=info)
 
     id: strawberry.ID
     key: str = strawberry_django.field(description="The agent's name for the stream, the same across its restarts: the name of the LiveKit track it is published as")
@@ -96,8 +99,9 @@ class Call:
 
     @classmethod
     def get_queryset(cls, queryset, info, **kwargs):
-        """Restrict every read of this type to the request's organization."""
-        return queryset.filter(organization=info.context.request.organization)
+        """Restrict every read of this type to the request's organization. A call is in no
+        collaboration (it is not a structure lovekit hosts): a guest sees none."""
+        return object_scope(queryset.filter(organization=info.context.request.organization), info=info)
 
     id: strawberry.ID
     title: str
@@ -134,7 +138,7 @@ class CallInvite:
     def get_queryset(cls, queryset, info, **kwargs):
         """Only the caller's own invitations, in their organization."""
         request = info.context.request
-        return queryset.filter(invitee=request.user, call__organization=request.organization)
+        return object_scope(queryset.filter(invitee=request.user, call__organization=request.organization), info=info)
 
     id: strawberry.ID
     call: Call

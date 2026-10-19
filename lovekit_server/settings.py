@@ -59,6 +59,8 @@ INSTALLED_APPS = [
     "bridge",
     "health_check",
     "health_check.db",
+    # Collaborations of lovekit's agents and streams, which a guest of the organization is granted and held to.
+    "arkitekt_service.collaborations",
     # What every service is as a Django server: `ensureadmin`, `validate_settings`, and the
     # check that warns about config keys this release does not read. Last, so that a command
     # of the service's own with the same name is the one that runs.

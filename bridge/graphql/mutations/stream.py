@@ -5,11 +5,14 @@ start: ``declareStreams`` is the whole set. A stream it declared before keeps it
 id, one it leaves out is removed, and a start that declares what it declared last time writes
 nothing at all, so the organization hears only of real changes (the ``streams``
 subscription). ``publishToken`` lets the agent into its own room as its one publisher;
-``watchStream`` and ``watchAgent`` let anyone of the organization in to watch.
+``watchStream`` and ``watchAgent`` let anyone of the organization in to watch, and a guest of it
+who has the agent in one of their collaborations: a watch token opens the agent's whole room, so
+it is the agent that has to be shared, not only the stream.
 """
 
 import logging
 
+from arkitekt_service.collaborations.guests import arequire_in_collaboration
 from asgiref.sync import sync_to_async
 from django.db import transaction
 from kante.types import Info
@@ -123,15 +126,18 @@ def _watch_token(info: Info, agent: models.Agent) -> str:
 async def watch_stream(info: Info, input: inputs.WatchStreamInput) -> str:
     """A token to watch a stream: subscribe to its agent's room, where it is the track named by its key.
 
-    Scoped first: a stream of another organization does not exist for this caller.
+    Scoped first: a stream of another organization does not exist for this caller. A guest
+    needs the stream's agent in a collaboration: the token subscribes to every track there.
     """
     stream = await models.Stream.objects.select_related("agent").aget(id=input.stream, agent__organization=info.context.request.organization)
+    await arequire_in_collaboration(stream.agent, info=info)
     await calls.create_room(stream.agent.room_name)
     return _watch_token(info, stream.agent)
 
 
 async def watch_agent(info: Info, input: inputs.WatchAgentInput) -> str:
-    """A token to watch every stream of an agent at once."""
+    """A token to watch every stream of an agent at once; a guest's, of an agent in their collaborations."""
     agent = await models.Agent.objects.aget(id=input.agent, organization=info.context.request.organization)
+    await arequire_in_collaboration(agent, info=info)
     await calls.create_room(agent.room_name)
     return _watch_token(info, agent)

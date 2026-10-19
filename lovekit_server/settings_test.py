@@ -30,6 +30,9 @@ LIVEKIT = {
 AUTHENTIKATE = {
     **AUTHENTIKATE,
     "allow_static_tokens_in_production": True,
+    # This service instance, as konstruktor renders it: what a guest's collaborations are
+    # listed under (tests/test_sharing.py).
+    "audience": "1",
     "static_tokens": {
         "test": {"sub": "1"},
         # A second, distinct identity for ownership/cross-user denial tests. The
