@@ -62,7 +62,7 @@ def intake(settings):
     settings.REKUEST_SERVICE = {"REKUEST_URL": server.url, "SERVICE": "lovekit"}
     settings.INSTANCE = {
         "PRIVATE_KEY": KEY.as_pem(private=True).decode(),
-        "TRUST_JWKS": {"keys": [{**trust.public_jwk(KEY), "service": "live.arkitekt.lovekit"}]},
+        "TRUST_JWKS": {"keys": [{**trust.public_jwk(KEY), "service": "lovekit"}]},
     }
     yield server
     server.server.shutdown()
@@ -97,7 +97,7 @@ async def test_a_declaration_is_signalled_once_and_a_restart_not_at_all(intake, 
     by_object = {r["json"]["object"]: r for r in received}
     assert by_object[microphone]["json"]["descriptors"] == {"@lovekit/stream_kind": "audio"}
     first = received[0]
-    assert trust.verify("POST", first["path"], first["body"], first["headers"]["Authorization"], audience="live.arkitekt.rekuest").issuer == "live.arkitekt.lovekit"
+    assert trust.verify("POST", first["path"], first["body"], first["headers"]["Authorization"], audience="rekuest").issuer == "lovekit"
 
     # The agent restarts with the same streams: the hub hears nothing.
     intake.received.clear()

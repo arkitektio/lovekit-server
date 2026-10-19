@@ -125,15 +125,12 @@ async def test_a_stream_the_agent_declares_later_is_shared_with_it(authenticated
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 @pytest.mark.docker
-async def test_a_stream_shared_alone_is_seen_alone(authenticated_context, guest):
+async def test_a_stream_is_shared_with_its_agent_never_alone(authenticated_context):
+    """A stream is part of its agent: it is put in a collaboration with the agent, whose room it is heard in."""
     streams = await _declare(authenticated_context, "camera", "microphone")
     camera = await models.Stream.objects.aget(id=streams["camera"]["id"])
-    ctx = guest({await _collaboration(authenticated_context, camera): []})
-
-    listed = await _run(ctx, "{ streams { id } agents { id } }")
-    assert not listed.errors, listed.errors
-    assert listed.data == {"streams": [{"id": str(camera.id)}], "agents": []}
-    assert (await _run(ctx, STREAM, id=streams["microphone"]["id"])).errors
+    with pytest.raises(collaboration_items.SharedWithItsWhole):
+        await _collaboration(authenticated_context, camera)
 
 
 @pytest.mark.django_db(transaction=True)
@@ -163,13 +160,11 @@ async def test_a_guest_watches_a_shared_agent_without_publishing(authenticated_c
 async def test_a_guest_watches_no_agent_they_were_not_granted(authenticated_context, second_app_context, guest):
     streams = await _declare(authenticated_context, "camera", "microphone")
     other = await _declare(second_app_context, "elsewhere")
-    camera = await models.Stream.objects.aget(id=streams["camera"]["id"])
-    # The camera alone: its token would open the agent's room, the microphone in it too.
-    ctx = guest({await _collaboration(authenticated_context, camera): []})
+    # Granted the one agent, and nothing of the other.
+    ctx = guest({await _collaboration(authenticated_context, await _agent(streams["camera"])): []})
 
-    _refused(await _run(ctx, WATCH_STREAM, input={"stream": streams["camera"]["id"]}), "SHARE_INSUFFICIENT")
-    _refused(await _run(ctx, WATCH_AGENT, input={"agent": streams["camera"]["agent"]["id"]}), "SHARE_INSUFFICIENT")
     _refused(await _run(ctx, WATCH_STREAM, input={"stream": other["elsewhere"]["id"]}), "SHARE_INSUFFICIENT")
+    _refused(await _run(ctx, WATCH_AGENT, input={"agent": other["elsewhere"]["agent"]["id"]}), "SHARE_INSUFFICIENT")
 
 
 @pytest.mark.django_db(transaction=True)
