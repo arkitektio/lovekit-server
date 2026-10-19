@@ -187,6 +187,29 @@ present, all three fields are required.
 | `api_secret` 🔒 | `LIVEKIT__API_SECRET` | str | **required** | LiveKit API secret. |
 | `api_url` | `LIVEKIT__API_URL` | str | **required** | LiveKit server URL. |
 
+### `rekuest_hook` — how streams are announced to the hub's rekuest (optional)
+
+Omit the block and nothing is announced: agents still declare and publish their streams, but
+no trigger hears of them.
+
+| Key | Env var | Type | Default | Description |
+|---|---|---|---|---|
+| `rekuest_url` | `REKUEST_HOOK__REKUEST_URL` | str | `"http://rekuest:80/rekuest"` | rekuest's base URL on the internal network. |
+| `service` | `REKUEST_HOOK__SERVICE` | str | `"lovekit"` | The name rekuest knows this process by: its `rekuest.services[].name` (signals are sent as it). |
+| `max_skew` | `REKUEST_HOOK__MAX_SKEW` | int | `30` | Clock skew (seconds) tolerated on a signed request; tokens themselves live 60 s. |
+
+### `instance` — this instance's key and the hub trust bundle (optional)
+
+No shared secrets: requests between this service and rekuest carry short-lived JWTs signed with
+each side's instance key, checked against the hub's trust bundle (the coord-vouched public keys
+of every instance). Without it nothing is announced.
+
+| Key | Env var | Type | Default | Description |
+|---|---|---|---|---|
+| `private_key` 🔒 | `INSTANCE__PRIVATE_KEY` | str | **required** | Ed25519 private key (PKCS#8 PEM). |
+| `trust.jwks_uri` | `INSTANCE__TRUST__JWKS_URI` | str? | `null` | The coord's hub-keys URL (fakts `self.hub_keys_url`). |
+| `trust.jwks` | — | object? | `null` | Or the bundle inline, for a hub not enrolled yet. |
+
 ---
 
 ## Minimal example

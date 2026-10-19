@@ -2,10 +2,11 @@ from pydantic import BaseModel, Field
 
 
 class StreamSignal(BaseModel):
-    """A model representing a stream update event."""
-    create: int | None = Field(None, description="The stream that was created.")
-    update: int | None = Field(None, description="The stream that was updated.")
-    delete: int | None = Field(None, description="The stream that was deleted.")
+    """An agent declaring a stream for the first time, changing one, or leaving one out."""
+
+    create: int | None = Field(None, description="The stream that was declared for the first time.")
+    update: int | None = Field(None, description="The stream whose title, kind or description changed.")
+    delete: int | None = Field(None, description="The stream its agent no longer declares.")
 
 
 class CallInviteSignal(BaseModel):

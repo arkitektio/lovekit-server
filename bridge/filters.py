@@ -1,83 +1,67 @@
 import strawberry
 from asgiref.sync import async_to_sync
-from bridge import calls, inputs
+from bridge import calls, inputs, streams
 from bridge import models
 from django.db.models import Q, QuerySet
 import strawberry_django
 
 
-@strawberry_django.order(models.Streamer)
-class StreamerOrder:
-    created_at: strawberry.auto
-
-
-@strawberry_django.order(models.Stream)
+@strawberry_django.order_type(models.Stream)
 class StreamOrder:
     created_at: strawberry.auto
+    title: strawberry.auto
 
 
-@strawberry_django.filter(models.Streamer, description="Filter for Dask Clusters")
-class StreamerFilter:
-    """Filter for Dask Clusters"""
+@strawberry_django.filter_type(models.Agent, description="Filter for agents")
+class AgentFilter:
+    @strawberry_django.filter_field
+    def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
+        return Q(**{f"{prefix}id__in": value})
 
-    ids: list[strawberry.ID] | None = None
-    search: str | None = None
-    pass
+    @strawberry_django.filter_field
+    def search(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}client__name__icontains": value}) | Q(**{f"{prefix}client__client_id__icontains": value})
 
-    def filter_search(self, queryset, search):
-        return queryset.filter(name__icontains=search)
+    @strawberry_django.filter_field(description="Agents running as this client (its OAuth client id), as rekuest knows it too.")
+    def client_id(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}client__client_id": value})
 
-    def filter_ids(self, queryset, ids):
-        return queryset.filter(id__in=ids)
+    @strawberry_django.filter_field(description="Agents running for this user (the `sub` their token carries).")
+    def user_sub(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}user__sub": value})
 
 
-
-
-@strawberry_django.filter(models.Stream, description="Filter for Streams")
+@strawberry_django.filter_type(models.Stream, description="Filter for streams")
 class StreamFilter:
-    """Filter for Dask Clusters"""
+    @strawberry_django.filter_field
+    def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
+        return Q(**{f"{prefix}id__in": value})
 
-    ids: list[strawberry.ID] | None = None
-    search: str | None = None
-    pass
+    @strawberry_django.filter_field
+    def search(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}title__icontains": value}) | Q(**{f"{prefix}key__icontains": value})
 
-    def filter_search(self, queryset, search):
-        return queryset.filter(name__icontains=search)
+    @strawberry_django.filter_field(description="Streams of this agent.")
+    def agent(self, value: strawberry.ID, prefix: str) -> Q:
+        return Q(**{f"{prefix}agent_id": value})
 
-    def filter_ids(self, queryset, ids):
-        return queryset.filter(id__in=ids)
+    @strawberry_django.filter_field(description="Streams of the agent running as this client (its OAuth client id), as rekuest knows it too.")
+    def client_id(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}agent__client__client_id": value})
 
+    @strawberry_django.filter_field(description="Streams of agents running for this user (the `sub` their token carries).")
+    def user_sub(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}agent__user__sub": value})
 
-@strawberry_django.filter(models.SoloBroadcast, description="Filter for Solo Broadcasts")
-class SoloBroadcastFilter:
-    """Filter for Dask Clusters"""
-
-    ids: list[strawberry.ID] | None = None
-    search: str | None = None
-    pass
-
-    def filter_search(self, queryset, search):
-        return queryset.filter(name__icontains=search)
-
-    def filter_ids(self, queryset, ids):
-        return queryset.filter(id__in=ids)
-
-
-
-@strawberry_django.filter(models.CollaborativeBroadcast, description="Filter for Solo Broadcasts")
-class CollaborativeBroadcastFilter:
-    """Filter for Dask Clusters"""
-
-    ids: list[strawberry.ID] | None = None
-    search: str | None = None
-    pass
-
-    def filter_search(self, queryset, search):
-        return queryset.filter(name__icontains=search)
-
-    def filter_ids(self, queryset, ids):
-        return queryset.filter(id__in=ids)
-
+    @strawberry_django.filter_field(description="Only streams their agent publishes right now (true), or does not (false).")
+    def live(self, value: bool, queryset: QuerySet, prefix: str) -> tuple[QuerySet, Q]:
+        # The queryset is built in a worker thread, so LiveKit is asked synchronously: once
+        # for the rooms, once per agent room that is up.
+        published = Q(pk__in=[])
+        for agent_id, keys in async_to_sync(streams.live_tracks)().items():
+            if keys:
+                published |= Q(**{f"{prefix}agent_id": agent_id, f"{prefix}key__in": sorted(keys)})
+        return queryset, (published if value else ~published)
 
 
 @strawberry_django.order_type(models.Call)

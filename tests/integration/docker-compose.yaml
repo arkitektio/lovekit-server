@@ -15,7 +15,19 @@ services:
       # Dev mode ships the well-known devkey/secret keypair (see settings_test.LIVEKIT).
       image: livekit/livekit-server:latest
       command: --dev --bind 0.0.0.0
+      # Media goes over one TCP and one UDP port, published as the same numbers and
+      # announced as 127.0.0.1, so a test publishing a track from the host gets through
+      # (ICE needs the candidate port to be the host port).
+      environment:
+         LIVEKIT_CONFIG: |
+            rtc:
+              tcp_port: 7782
+              udp_port: 7783
+              node_ip: 127.0.0.1
+              use_external_ip: false
       # Host port 7780 (not 7880) to avoid clashing with a running arkitekt
       # deployment that already publishes livekit on 7880.
       ports:
          - 7780:7880
+         - 7782:7782
+         - 7783:7783/udp

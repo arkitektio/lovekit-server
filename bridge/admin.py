@@ -12,4 +12,5 @@ class HistoryAdmin(SimpleHistoryAdmin):  # type: ignore
 
     list_display = ["id"]
 
+admin.site.register(models.Agent)
 admin.site.register(models.Stream)

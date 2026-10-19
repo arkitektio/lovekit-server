@@ -1,105 +1,66 @@
+from arkitekt_service.service.described import Described
+from authentikate.models import Client, Organization, User
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
-from django.contrib.auth import get_user_model
-import uuid
-from django.conf import settings
 
-from typing import List
-from authentikate.models import Client, User, Organization
+from bridge import enums
 
 
 
-class Broadcast(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True, help_text="The time this broadcast was created")
-    
-       
+class Agent(models.Model):
+    """An app instance that owns live streams: one per client, user and organization.
+
+    The same key rekuest gives its agents (``facade_agent``): whatever runs as that client,
+    for that user, in that organization, is this agent, and a restarted process is the same
+    agent again. All of its streams are tracks in one LiveKit room (``room_name``), which only
+    the agent publishes into and everyone in its organization may watch.
+    """
+
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="lovekit_agents", help_text="The client (app instance) this agent runs as")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="lovekit_agents", help_text="The user this agent runs for")
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="lovekit_agents", help_text="The organization whose members may watch this agent's streams")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="When this agent first declared its streams")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["client", "user", "organization"], name="one_agent_per_client_user_org"),
+        ]
+
     @property
-    def streamlit_room_id(self) -> str:
-        """
-        Returns the room ID for this agent. All streams created by this agent will use this room ID.
-        """
-        return f"broadcast-{self.id}"
-        
-class SoloBroadcast(Broadcast):
-    title = models.CharField(max_length=1000, help_text="The Title of the Broadcast")
+    def room_name(self) -> str:
+        """The LiveKit room every stream of this agent is a track in."""
+        return f"agent-{self.id}"
 
-    streamer = models.ForeignKey(
-        "Streamer",
-        on_delete=models.CASCADE,
-        related_name="solo_broadcasts",
-        help_text="The agent that created this private broadcast",
-    )
-    
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["title", "streamer"], name="Unique broadcast title for solo broadcast"
-            )
-        ]
-    
-    
-class CollaborativeBroadcast(Broadcast):
-    title = models.CharField(max_length=1000, help_text="The Title of the Broadcast")
-    streamers = models.ManyToManyField(
-        "Streamer",
-        related_name="collaborative_broadcasts",
-        help_text="Users that can collaborate on this broadcast",
-    )
-    
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["title"], name="Unique broadcast title for collaborative broadcast"
-            )
-        ]
-    
+    @property
+    def publisher_identity(self) -> str:
+        """The one identity the agent publishes as: a newer connection replaces an older one."""
+        return f"agent-{self.id}"
 
 
+class Stream(Described):
+    """One live source an agent declared: a camera, a detector, a microphone.
 
-class Streamer(models.Model):
-    instance_id = models.CharField(max_length=10000, null=True)
-    client = models.ForeignKey(Client, on_delete=models.CASCADE)
-    user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name="streamers",
-        help_text="The user that created this comment",
-    )
+    Declared by the agent on every start (``declareStreams``), under a ``key`` of its own
+    choosing, so the same source is the same stream (and the same id) across restarts. The key
+    is also the name of the LiveKit track the agent publishes it as. Whether it is live is
+    LiveKit's answer (the agent publishes a track of that name), not a column here.
+    """
 
-
-
-
-class Stream(models.Model):
-    streamer = models.ForeignKey(
-        "Streamer",
-        on_delete=models.CASCADE,
-        related_name="streams",
-        help_text="The agent that created this stream",
-    )
-    broadcast = models.ForeignKey(
-        "Broadcast",
-        on_delete=models.CASCADE,
-        related_name="streams",
-        null=True,
-        blank=True,
-        help_text="The broadcast this stream belongs to, if any.",
-    )
-    kind = models.CharField(
-        max_length=50,
-        help_text="The type of stream",
-    )
-    
-    title = models.CharField(max_length=1000, help_text="The Title of the Stream")
+    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="streams", help_text="The agent that declared this stream")
+    key = models.CharField(max_length=200, help_text="The agent's name for this stream, stable across restarts; the name of its LiveKit track")
+    title = models.CharField(max_length=1000, help_text="What the stream is called")
+    kind = models.CharField(max_length=50, choices=[(kind.value, kind.name) for kind in enums.StreamKind], help_text="Whether this is video or audio")
+    description = models.TextField(null=True, blank=True, help_text="What the stream shows")
+    created_at = models.DateTimeField(auto_now_add=True, help_text="When the agent first declared this stream")
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(
-                fields=["streamer", "title"], name="Unique stream for agent"
-            )
+            models.UniqueConstraint(fields=["agent", "key"], name="one_stream_per_agent_key"),
         ]
-        
-    
-    
+        indexes = [GinIndex(fields=["stored_descriptors"], name="bridge_stream_desc_gin", opclasses=["jsonb_path_ops"])]
 
+    def __str__(self) -> str:
+        return f"{self.title} [{self.key}]"
 
 
 class Structure(models.Model):
@@ -173,6 +134,3 @@ class CallInvite(models.Model):
     invitee = models.ForeignKey(User, on_delete=models.CASCADE, related_name="call_invites")
     created_at = models.DateTimeField(auto_now_add=True)
     dismissed_at = models.DateTimeField(null=True, blank=True)
-
-
-from .signals import * 

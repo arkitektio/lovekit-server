@@ -39,6 +39,8 @@ AUTHENTIKATE = {
         # The same second user acting in ANOTHER organization, for tenant
         # scoping tests: a call of static_org must not exist for them.
         "stranger": {"sub": "9", "org": "another_org"},
+        # The first user running a second app: another client, so another agent.
+        "secondapp": {"sub": "1", "client_id": "secondapp"},
     },
 }
 

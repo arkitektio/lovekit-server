@@ -25,6 +25,7 @@ from kante.path import dynamicpath
 from django.http import HttpResponse
 from health_check.views import MainView
 from django.views.decorators.csrf import csrf_exempt
+from lovekit_server.service import service as rekuest_service
 
 def fakts_challenge(request):
     """
@@ -43,4 +44,6 @@ urlpatterns = [
     dynamicpath("schema", graphql_schema),
     dynamicpath("ht",  csrf_exempt(MainView.as_view()), name="health_check"),
     dynamicpath(".well-known/fakts-challenge", fakts_challenge, name="fakts-challenge"),
+    # What this service hosts and emits, read by the hub's rekuest (internal network only).
+    *rekuest_service.urls,
 ]

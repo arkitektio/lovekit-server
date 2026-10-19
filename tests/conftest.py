@@ -146,9 +146,21 @@ def other_user_context(db, backend_stack) -> HttpContext:
     """A second, distinct user — for ownership/cross-user denial tests.
 
     Uses the "othertest" static token (sub 9) so the AuthentikateExtension
-    actually authenticates it as a separate Streamer-owning user.
+    actually authenticates it as a separate user.
     """
     return _make_context(token="othertest", sub="9", username="static_issuer_9", org_slug="static_org")
+
+
+@pytest.fixture(scope="function")
+def stranger_context(db, backend_stack) -> HttpContext:
+    """The second user in ANOTHER organization ("stranger"), for tenant scoping tests."""
+    return _make_context(token="stranger", sub="9", username="static_issuer_9", org_slug="another_org")
+
+
+@pytest.fixture(scope="function")
+def second_app_context(db, backend_stack) -> HttpContext:
+    """The first user running a second app ("secondapp"): another client, so another agent."""
+    return _make_context(token="secondapp", sub="1", username="static_issuer_1", org_slug="static_org")
 
 
 # ---------------------------------------------------------------------------
@@ -183,38 +195,3 @@ async def livekit_client(backend_stack):
     client = get_api()
     yield client
     await client.aclose()
-
-
-@pytest.fixture
-def make_streamer(authenticated_context):
-    """Factory: create a Streamer row for a given context's user/client."""
-    from bridge.models import Streamer
-
-    @sync_to_async
-    def _make(context=None):
-        ctx = context or authenticated_context
-        streamer, _ = Streamer.objects.get_or_create(
-            user=ctx.request.user,
-            client=ctx.request.client,
-        )
-        return streamer
-
-    return _make
-
-
-@pytest.fixture
-def make_solo_broadcast(authenticated_context, make_streamer):
-    """Factory: create a SoloBroadcast row (no LiveKit room — DB only)."""
-    from bridge.models import SoloBroadcast, Streamer
-
-    @sync_to_async
-    def _make(context=None, title="Untitled"):
-        ctx = context or authenticated_context
-        streamer, _ = Streamer.objects.get_or_create(
-            user=ctx.request.user,
-            client=ctx.request.client,
-        )
-        broadcast, _ = SoloBroadcast.objects.get_or_create(streamer=streamer, title=title)
-        return broadcast
-
-    return _make

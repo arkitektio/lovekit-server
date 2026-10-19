@@ -15,34 +15,18 @@ import kante
 class Query:
     """The root query type"""
 
-    streams: List[types.Stream] = strawberry_django.field(description="Get a stream")
-    solo_broadcasts: List[types.SoloBroadcast] = strawberry_django.field(
-        description="Get all solo broadcasts",
-    )
-    collaborative_broadcasts: List[types.CollaborativeBroadcast] = strawberry_django.field(
-        description="Get all collaborative broadcasts",
-    )
+    streams: List[types.Stream] = strawberry_django.field(description="The streams of the organization's agents; filter `live` for the ones being published")
+    agents: List[types.Agent] = strawberry_django.field(description="The organization's agents that offer streams")
 
-    @strawberry_django.field(
-        description="Get a stream by ID",
-    )
-    def stream(self, id: strawberry.ID) -> types.Stream:
-        """Get a stream by ID"""
-        return models.Stream.objects.get(id=id)
+    @strawberry_django.field(description="Get a stream by ID")
+    def stream(self, info: Info, id: strawberry.ID) -> types.Stream:
+        """A stream of an agent of the caller's organization."""
+        return models.Stream.objects.get(id=id, agent__organization=info.context.request.organization)
 
-    @strawberry_django.field(
-        description="Get a solo broadcast by ID",
-    )
-    def solo_broadcast(self, id: strawberry.ID) -> types.SoloBroadcast:
-        """Get a solo broadcast by ID"""
-        return models.SoloBroadcast.objects.get(id=id)
-
-    @strawberry_django.field(
-        description="Get a collaborative broadcast by ID",
-    )
-    def collaborative_broadcast(self, id: strawberry.ID) -> types.CollaborativeBroadcast:
-        """Get a collaborative broadcast by ID"""
-        return models.CollaborativeBroadcast.objects.get(id=id)
+    @strawberry_django.field(description="Get an agent by ID")
+    def agent(self, info: Info, id: strawberry.ID) -> types.Agent:
+        """An agent of the caller's organization."""
+        return models.Agent.objects.get(id=id, organization=info.context.request.organization)
 
     calls: List[types.Call] = strawberry_django.field(description="The organization's calls; filter `live` for the ones in progress")
 
@@ -68,14 +52,11 @@ class Query:
 class Mutation:
     """The root mutation type"""
 
-    # Broadcast-related mutations
-    ensure_solo_broadcast: types.SoloBroadcast = strawberry_django.field(resolver=mutations.ensure_solo_broadcast, description="Create a solo broadcast")
-    ensure_collaborative_broadcast: types.CollaborativeBroadcast = strawberry_django.field(resolver=mutations.ensure_collaborative_broadcast, description="Create a collaborative broadcast")
-
-    # Stream-related mutations
-    ensure_stream: str = strawberry_django.field(resolver=mutations.ensure_stream, description="Create a stream and return the token for it")
-
-    join_broadcast: str = strawberry_django.field(resolver=mutations.join_broadcast, description="Join a solo broadcast and return the token for it")
+    # Agent streams: what an app instance offers live, its own and nobody else's
+    declare_streams: List[types.Stream] = strawberry_django.field(resolver=mutations.declare_streams, description="Offer exactly these streams as the caller's agent: undeclared ones are removed, unchanged ones untouched")
+    publish_token: str = strawberry_django.field(resolver=mutations.publish_token, description="A token for the caller's agent to publish its streams; a newer connection replaces an older one")
+    watch_stream: str = strawberry_django.field(resolver=mutations.watch_stream, description="A token to watch a stream: its agent's room, where it is the track named by its key")
+    watch_agent: str = strawberry_django.field(resolver=mutations.watch_agent, description="A token to watch every stream of an agent")
 
     # Calls: multi-party rooms about structures
     ensure_call: types.Call = strawberry_django.field(resolver=mutations.ensure_call, description="The live call about these structures, or a new one")
@@ -91,7 +72,7 @@ class Subscription:
 
     streams = strawberry.subscription(
         resolver=subscriptions.streams,
-        description="Subscribe to stream events",
+        description="Streams your organization's agents declare, change and drop, as they do",
     )
     call_invites = strawberry.subscription(
         resolver=subscriptions.call_invites,

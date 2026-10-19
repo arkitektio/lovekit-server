@@ -4,71 +4,77 @@ from typing import List, Optional
 import strawberry
 import strawberry_django
 from asgiref.sync import sync_to_async
+import kante
 from authentikate.strawberry.types import Client, User
-from bridge import calls, enums, filters, models
+from bridge import calls, enums, filters, models, streams
 from kante.types import Info
+from strawberry.scalars import JSON
 
 
-@strawberry_django.type(models.Streamer, filters=filters.StreamerFilter, pagination=True)
-class Streamer:
+DESCRIPTORS_DESCRIPTION = (
+    "This object's descriptors, a flat mapping of key to value: the facts about it that an action's port can `require` and a trigger can test "
+    "(e.g. `@lovekit/stream_kind`). The keys are the ones lovekit declares for this structure, and the values are the ones a signal about the object carries. "
+    "Empty for a structure that declares none"
+)
+
+
+def resolve_descriptors(root) -> JSON:  # noqa: ANN001 - the model instance behind any hosted type
+    """The descriptors of a hosted object, from its structure's declaration (``lovekit_server.service``)."""
+    from lovekit_server.service import service  # the declaration imports bridge.models
+
+    return service.describe(root)
+
+
+def _agent_room(agent_id: int) -> tuple[str, str]:
+    """The agent's room and the identity it publishes as there (``models.Agent``)."""
+    return f"agent-{agent_id}", f"agent-{agent_id}"
+
+
+@strawberry_django.type(models.Agent, filters=filters.AgentFilter, pagination=True, description="An app instance that owns live streams: one per client, user and organization")
+class Agent:
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        """Restrict every read of this type to the request's organization."""
+        return queryset.filter(organization=info.context.request.organization)
+
     id: strawberry.ID
-    user: User
     client: Client
-    solo_broadcasts: Optional["SoloBroadcast"] = strawberry_django.field(
-        description="The solo broadcasts created by this agent, if any."
-    )
-    collaborative_broadcasts: List["CollaborativeBroadcast"] = strawberry_django.field(
-        description="The collaborative broadcasts created by this agent."
-    )
+    user: User
+    created_at: datetime.datetime
+    streams: List["Stream"] = strawberry_django.field(description="Every stream the agent offers, as it declared them last")
+
+    @strawberry_django.field(only=["client__name", "client__client_id"], description="What the agent is called: its client's name, or its client id.")
+    def name(self) -> str:
+        return self.client.name or self.client.client_id
+
+    @strawberry.field(description="The LiveKit room the agent's streams are tracks in.")
+    def room_name(self) -> str:
+        return self.room_name
+
+    @strawberry_django.field(only=["id"], description="Whether the agent publishes any of its streams right now.")
+    async def live(self, info: Info) -> bool:
+        return bool(await streams.tracks_loader(info.context).load(_agent_room(self.id)))
 
 
-
-@strawberry_django.type(models.Stream, filters=filters.StreamFilter,  pagination=True)
+@strawberry_django.type(models.Stream, filters=filters.StreamFilter, order=filters.StreamOrder, pagination=True, description="One live source an agent offers: a camera, a detector, a microphone")
 class Stream:
+    @classmethod
+    def get_queryset(cls, queryset, info, **kwargs):
+        """Restrict every read of this type to the request's organization."""
+        return queryset.filter(agent__organization=info.context.request.organization)
+
     id: strawberry.ID
+    key: str = strawberry_django.field(description="The agent's name for the stream, the same across its restarts: the name of the LiveKit track it is published as")
+    title: str
     kind: enums.StreamKind
-    streamer: Streamer
-    title: str
-
-
-@strawberry_django.type(models.SoloBroadcast, filters=filters.SoloBroadcastFilter, pagination=True)
-class SoloBroadcast:
-    id: strawberry.ID
-    title: str
+    description: Optional[str]
     created_at: datetime.datetime
-    streamer: Streamer
+    agent: Agent
+    descriptors: JSON = kante.django_field(resolver=resolve_descriptors, only=["stored_descriptors", "kind"], description=DESCRIPTORS_DESCRIPTION)
 
-    @strawberry.field
-    def video_streams(self) -> List[Stream]:
-        return self.streams.filter(kind=enums.StreamKind.VIDEO)
-    
-    @strawberry.field
-    def audio_streams(self) -> List[Stream]:
-        return self.streams.filter(kind=enums.StreamKind.AUDIO)
-    
-    
-    
-@strawberry_django.type(models.CollaborativeBroadcast, filters=filters.CollaborativeBroadcastFilter, pagination=True)
-class CollaborativeBroadcast:
-    id: strawberry.ID
-    title: str
-    created_at: datetime.datetime
-    streamers: List[Streamer] = strawberry_django.field(
-        description="The streamers that are collaborating on this broadcast."
-    )
-
-    @strawberry.field
-    def streams(self) -> List[Stream]:
-        return Stream.objects.filter(agent__in=self.streamers, kind=enums.StreamKind.VIDEO)
-    
-    
-    @strawberry.field
-    def video_streams(self) -> List[Stream]:
-        return self.streamer.streams.filter(kind=enums.StreamKind.VIDEO)
-    
-    @strawberry.field
-    def audio_streams(self) -> List[Stream]:
-        return self.streamer.streams.filter(kind=enums.StreamKind.AUDIO)
+    @strawberry_django.field(only=["agent_id", "key"], description="Whether the agent publishes this stream right now: LiveKit's answer, asked when read.")
+    async def live(self, info: Info) -> bool:
+        return self.key in await streams.tracks_loader(info.context).load(_agent_room(self.agent_id))
 
 
 @strawberry_django.type(models.Structure, description="A reference to an object on another service")

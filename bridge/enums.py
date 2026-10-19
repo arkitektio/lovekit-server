@@ -2,10 +2,9 @@ import strawberry
 from enum import Enum
 
 
-@strawberry.enum(description="The state of a dask cluster")
+@strawberry.enum(description="What a stream carries")
 class StreamKind(str, Enum):
-    """The state of a dask cluster"""
+    """What a stream carries: pictures or sound."""
+
     VIDEO = "video"
     AUDIO = "audio"
-    
-

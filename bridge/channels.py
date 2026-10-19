@@ -1,7 +1,9 @@
 from kante.channel import build_channel
 from bridge.channel_signals import CallInviteSignal, CallSignal, StreamSignal
 
-stream_channel = build_channel(StreamSignal)
+# One group per organization (`stream_group(org)`), on both sides: an agent declaring its
+# streams is news for everyone who may watch them.
+stream_channel = build_channel(StreamSignal, name="streams")
 
 # Named, so it never receives the stream channel's broadcasts. One group per
 # invitee (`call_invite_channel.org_group(org, user.sub)`), on both sides.

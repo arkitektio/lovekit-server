@@ -12,7 +12,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from arkitekt_service.server import settings as shared
-from arkitekt_service.server.settings import DjangoSettings, PostgresSettings, ServiceSettings
+from arkitekt_service.server.settings import DjangoSettings, InstanceSettings, PostgresSettings, ServiceSettings
 from authentikate.base_models import AuthentikateSettings
 
 class RedisSettings(shared.RedisSettings):
@@ -29,6 +29,14 @@ class LivekitSettings(BaseModel):
     api_url: str = Field(description="LiveKit server URL.")
 
 
+class RekuestHookSettings(BaseModel):
+    """How this process reaches the hub's rekuest as a service (``rekuest_service``): where it sends its signals."""
+
+    rekuest_url: str = Field(default="http://rekuest:80/rekuest", description="rekuest's base URL on the internal network.")
+    service: str = Field(default="lovekit", description="The name rekuest knows this process by: its `rekuest.services[].name` (signals are sent as it).")
+    max_skew: int = Field(default=30, description="Clock skew (seconds) tolerated on a signed request; tokens themselves live 60 s.")
+
+
 class Settings(ServiceSettings):
     """Top-level, validated configuration for the lovekit service."""
 
@@ -37,3 +45,5 @@ class Settings(ServiceSettings):
     redis: RedisSettings = Field(description="Redis connection.")
     authentikate: AuthentikateSettings = Field(description="Token-verification config (authentikate).")
     livekit: Optional[LivekitSettings] = Field(default=None, description="Optional LiveKit media server credentials.")
+    rekuest_hook: Optional[RekuestHookSettings] = Field(default=None, description="Announce streams to the hub's rekuest (signals its triggers can fire on). Without it nothing is announced.")
+    instance: Optional[InstanceSettings] = Field(default=None, description="This instance's key and the hub trust bundle (signed requests to and from rekuest, no shared secrets).")

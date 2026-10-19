@@ -2,37 +2,30 @@ import strawberry
 from bridge import enums
 
 
-@strawberry.input
-class EnsureSoloBroadcastInput:
-    instance_id: str | None = None
-    title: str | None = None
-    
-    
+@strawberry.input(description="One stream an agent offers")
+class StreamDeclarationInput:
+    key: str = strawberry.field(description="The agent's own name for the stream, the same on every start; its LiveKit track is published under this name")
+    title: str | None = strawberry.field(default=None, description="What the stream is called; the key when not given")
+    kind: enums.StreamKind = strawberry.field(default=enums.StreamKind.VIDEO, description="Whether it is video or audio")
+    description: str | None = strawberry.field(default=None, description="What the stream shows")
 
-@strawberry.input
-class EnsureCollaborativeBroadcastInput:
-    instance_id: str | None = None
-    title: str | None = None    
-    
-    
-@strawberry.input
-class EnsureStreamInput:
-    broadcast: strawberry.ID | None = None
-    kind: enums.StreamKind = enums.StreamKind.VIDEO
-    title: str | None = None
-    
-    
-@strawberry.input
-class JoinBroadcastInput:
-    broadcast: strawberry.ID
-    
-    
-    
-@strawberry.input
-class JoinCollaborativeBroadcastInput:
-    id: strawberry.ID
-    instance_id: str | None = None
-    title: str | None = None
+
+@strawberry.input(description="Every stream an agent offers")
+class DeclareStreamsInput:
+    """The whole set: a stream the agent declared before and leaves out here is removed."""
+
+    streams: list[StreamDeclarationInput]
+
+
+@strawberry.input(description="The stream to watch")
+class WatchStreamInput:
+    stream: strawberry.ID
+
+
+@strawberry.input(description="The agent whose streams to watch")
+class WatchAgentInput:
+    agent: strawberry.ID
+
 
 @strawberry.input(description="A reference to an object on another service")
 class StructureInput:

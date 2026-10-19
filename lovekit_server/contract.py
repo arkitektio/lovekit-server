@@ -7,9 +7,40 @@ the same commit, and no installer has to learn of it.
 
 from __future__ import annotations
 
-from arkitekt_service.contract import JSON, Contract, Description, Facts, Job, Needs, Offers, Start, blocks
+from arkitekt_service.contract import JSON, Contract, Description, Descriptor, Facts, Hosts, Job, Needs, Offers, Signal, Start, Structure, blocks
 
 from lovekit_server.configuration import Settings
+
+
+#: What exists on a hub because this service is there: said here, as data, so the hub knows it from
+#: the image. ``service.py`` binds each of these to its model and refuses anything not said here.
+STREAM_DESCRIPTORS = [
+    Descriptor(key="@lovekit/stream_kind", type="STRING", description="What the stream carries: video or audio"),
+]
+
+HOSTS = Hosts(
+    structures=[
+        Structure(
+            identifier="@lovekit/agent",
+            label="Stream Agent",
+            description="An app instance that offers live streams (one per client, user and organization).",
+        ),
+        Structure(
+            identifier="@lovekit/stream",
+            label="Stream",
+            description="One live source an agent offers, a camera or a microphone, the same across the agent's restarts.",
+            descriptors=STREAM_DESCRIPTORS,
+        ),
+    ],
+    signals=[
+        Signal(
+            identifier="@lovekit/stream",
+            kinds=["CREATED", "UPDATED", "DELETED"],
+            descriptors=[descriptor.key for descriptor in STREAM_DESCRIPTORS],
+            description="An agent declared a stream for the first time, changed one, or stopped offering one. Not whether it is live.",
+        ),
+    ],
+)
 
 
 def render(facts: Facts) -> dict[str, JSON]:
@@ -18,6 +49,10 @@ def render(facts: Facts) -> dict[str, JSON]:
     livekit = facts.peers.get("livekit")
     if livekit is not None:
         document["livekit"] = {"api_key": livekit.settings["api_key"], "api_secret": livekit.settings["api_secret"], "api_url": livekit.url}
+    document["instance"] = blocks.instance(facts)
+    hook = blocks.rekuest_hook(facts)
+    if hook is not None:
+        document["rekuest_hook"] = hook
     return document
 
 
@@ -26,8 +61,10 @@ contract = Contract(
         name="lovekit",
         identifier="live.arkitekt.lovekit",
         summary="Live video and audio rooms.",
-        needs=Needs(storage=["media"], instance_key=False, peers=["livekit"]),
-        offers=Offers(),
+        needs=Needs(storage=["media"], instance_key=True, peers=["livekit", "rekuest"]),
+        offers=Offers(endpoints={"rekuest_service": "_rekuest/service"}),
+        requires={"rekuest": ">=6"},
+        hosts=HOSTS,
     ),
     settings=Settings,
     render=render,

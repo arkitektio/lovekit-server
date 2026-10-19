@@ -10,35 +10,46 @@ LiveKit directly. It is registered as `live.arkitekt.lovekit` and has a python c
 
 | Concept | What it is |
 | --- | --- |
-| `Streamer` | An app instance of a user that publishes: the client, the user, and the instance id. |
-| `SoloBroadcast` | A titled broadcast with one streamer. A title is unique per streamer. |
-| `CollaborativeBroadcast` | A titled broadcast several streamers publish into. A title is unique. |
-| `Stream` | One track a streamer publishes into a broadcast: its kind and title. |
+| `Agent` | An app instance that offers live streams: one per client, user and organization, the key rekuest gives its agents too. A restarted process is the same agent. |
+| `Stream` | One live source an agent offers (a camera, a detector, a microphone) under a `key` of the agent's choosing, unique per agent and the same across its restarts. |
+| `Call` | A multi-party room about some structures (`@mikro/image 42`), which everyone in its organization may join. |
+| `CallInvite` | Someone asking someone else into a call. |
 
-Each broadcast is one LiveKit room, named `broadcast-<id>`. A streamer joins as the
-participant `streamer-<id>`, a viewer as `user-<id>`.
+Each agent is one LiveKit room, `agent-<id>`, and each of its streams is the track named by
+the stream's key in it. Only the agent publishes there, always as the participant
+`agent-<id>`: a restarted process replaces the connection its predecessor left behind
+(LiveKit tells the old one `DUPLICATE_IDENTITY`). Whoever watches joins as `user-<id>-<nonce>`
+and may not publish. Whether a stream is live is LiveKit's answer, asked when it is read:
+the agent publishes a track of that name. Each call is the room `call-<id>`.
 
 ## API
 
-GraphQL is served at `/graphql` (HTTP and WebSocket), with the SDL at `/schema`.
+GraphQL is served at `/graphql` (HTTP and WebSocket), with the SDL at `/schema`. Everything
+is scoped to the caller's organization.
 
 | Operations | What they do |
 | --- | --- |
-| `ensureSoloBroadcast`, `ensureCollaborativeBroadcast` | Get or create the broadcast, and create its room on LiveKit. |
-| `ensureStream` | Get or create a stream in a broadcast, and return a LiveKit token that may join the room and publish. |
-| `joinBroadcast` | Return a LiveKit token that may join the room and subscribe, but not publish. |
-| `streams`, `soloBroadcasts`, `collaborativeBroadcasts` (and one by id) | The stored rows. |
-| `streams` (subscription) | Stream updates as they happen. |
+| `declareStreams` | The caller's agent offers exactly these streams. A stream it declared before keeps its id, one it leaves out is removed, and one that did not change is not written. |
+| `publishToken` | A LiveKit token for the caller's agent to publish into its room (after `declareStreams`). |
+| `watchStream`, `watchAgent` | A LiveKit token to subscribe in the agent's room, but not publish. |
+| `streams`, `agents` (and one by id) | The organization's agents and streams; `streams(filters: {live, agent, clientId, userSub})`. |
+| `streams` (subscription) | Streams declared, changed and dropped, as they are (not whether they are live). |
+| `ensureCall`, `addToCall`, `joinCall`, `inviteToCall`, `dismissCallInvite`, `calls`, `call`, `myCallInvites` | Calls. |
+| `calls`, `callInvites` (subscriptions) | Calls starting and changing, invitations arriving. |
 
 ## Hub integration
 
 Declared in [`lovekit_server/contract.py`](lovekit_server/contract.py):
 
 - **Needs**: the `livekit` peer, whose URL, API key and API secret the contract writes into
-  the `livekit` config block; `media` storage; tokens issued by lok.
+  the `livekit` config block; the `rekuest` peer and an instance key, to announce streams;
+  `media` storage; tokens issued by lok.
+- **Hosts**: `@lovekit/agent` and `@lovekit/stream` (descriptor `@lovekit/stream_kind`), bound
+  in [`lovekit_server/service.py`](lovekit_server/service.py). A stream's first declaration,
+  a change and its removal are signalled (`CREATED`, `UPDATED`, `DELETED`); whether it is
+  live is not.
 
-It defines no scopes or roles of its own, does not register with rekuest and offers no
-actions.
+It defines no scopes or roles of its own and offers no actions.
 
 ## Running
 
@@ -68,7 +79,8 @@ uv run pytest
 
 The suite runs against a real stack, brought up by [dokker](https://github.com/jhnnsrs/dokker)
 from `tests/integration/docker-compose.yaml`: Postgres (`jhnnsrs/daten:next`) and a LiveKit
-server in dev mode. It needs a running Docker daemon, and the host ports 5555 and 7780 free:
+server in dev mode (media over TCP 7782 and UDP 7783, so tests publish real tracks). It needs a running
+Docker daemon, and those host ports and 5555 and 7780 free:
 unlike the other services' suites, this stack pins its ports, so two runs cannot share a
 machine.
 
