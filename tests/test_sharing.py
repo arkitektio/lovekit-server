@@ -201,9 +201,9 @@ async def test_a_guest_publishes_nothing_joins_no_call_and_hears_nothing(authent
     await subscribed.aclose()
 
     # A call is in no collaboration.
-    calls = await _run(ctx, "{ calls { id } }")
+    calls = await _run(ctx, "{ calls { id } myCallInvites { id } }")
     assert not calls.errors, calls.errors
-    assert calls.data["calls"] == []
+    assert calls.data == {"calls": [], "myCallInvites": []}
     assert (await _run(ctx, "query ($id: ID!) { call(id: $id) { id } }", id=call_id)).errors
     assert await models.Agent.objects.acount() == 1
 
