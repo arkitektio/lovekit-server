@@ -15,7 +15,7 @@ from lovekit_server.configuration import Settings
 #: What exists on a hub because this service is there: said here, as data, so the hub knows it from
 #: the image. ``service.py`` binds each of these to its model and refuses anything not said here.
 STREAM_DESCRIPTORS = [
-    Descriptor(key="@lovekit/stream_kind", type="STRING", description="What the stream carries: video or audio"),
+    Descriptor(key="@lovekit/stream_kind", type="STRING", description="What the stream carries: video (pictures, e.g. from a camera) or audio (sound, e.g. from a microphone)"),
 ]
 
 HOSTS = Hosts(
@@ -23,12 +23,12 @@ HOSTS = Hosts(
         Structure(
             identifier="@lovekit/agent",
             label="Stream Agent",
-            description="An app instance that offers live streams (one per client, user and organization).",
+            description="An app instance that offers live streams, from its cameras or microphones, in one LiveKit room: one per client, user and organization.",
         ),
         Structure(
             identifier="@lovekit/stream",
-            label="Stream",
-            description="One live source an agent offers, a camera or a microphone, the same across the agent's restarts.",
+            label="Live Stream",
+            description="One live stream an agent offers: video or audio from one source (a camera or webcam, a detector, a microphone), published as a LiveKit track and the same across the agent's restarts.",
             descriptors=STREAM_DESCRIPTORS,
         ),
     ],
@@ -37,7 +37,7 @@ HOSTS = Hosts(
             identifier="@lovekit/stream",
             kinds=["CREATED", "UPDATED", "DELETED"],
             descriptors=[descriptor.key for descriptor in STREAM_DESCRIPTORS],
-            description="An agent declared a stream for the first time, changed one, or stopped offering one. Not whether it is live.",
+            description="An agent declared a live video or audio stream for the first time, changed one, or stopped offering one. Not whether it is live right now.",
         ),
     ],
 )
