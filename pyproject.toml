@@ -30,6 +30,7 @@ dependencies = [
     "whitenoise>=6.6",
     "django-polymorphic>=4.1.0",
     "arkitekt-service>=7.0.0",
+    "arkitekt-datalayer",
 ]
 
 [dependency-groups]
@@ -148,3 +149,6 @@ exclude = ["venv/", "tests/", "examples/"]
 plugins = ["mypy_django_plugin.main","pydantic.mypy"]
 ignore_missing_imports = true
 strict = true
+
+[tool.uv.sources]
+arkitekt-datalayer = { path = "../../../../packages/arkitekt-datalayer", editable = true }
