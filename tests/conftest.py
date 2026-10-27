@@ -114,7 +114,7 @@ def _make_context(token: str, sub: str, username: str, org_slug: str) -> HttpCon
         sub=sub, iss="static_issuer", defaults={"username": username}
     )
     client, _ = Client.objects.get_or_create(client_id="oinsoins")
-    org, _ = Organization.objects.get_or_create(slug=org_slug)
+    org, _ = Organization.objects.get_or_create(identifier=f"static_issuer#{org_slug}")
     membership, _ = Membership.objects.get_or_create(user=user, organization=org)
 
     request = UniversalRequest(
