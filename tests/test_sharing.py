@@ -45,7 +45,7 @@ def guest(db, authenticated_context, settings):
         granted = {str(collaboration.pk if isinstance(collaboration, Collaboration) else collaboration): roles for collaboration, roles in collaborations.items()}
         settings.AUTHENTIKATE = {
             **settings.AUTHENTIKATE,
-            "static_tokens": {**settings.AUTHENTIKATE["static_tokens"], "guest": {"sub": "20", "roles": [], "collabs": {"1": granted}}},
+            "static_tokens": {**settings.AUTHENTIKATE["static_tokens"], "guest": {"sub": "20", "roles": [], "collabs": {"1": granted}, "scope": "openid lovekit_all"}},
         }
         authentikate_settings.cached_settings = None
         return _context("guest")
@@ -230,4 +230,4 @@ def test_the_schema_says_what_each_type_is_and_what_a_guest_may_watch():
     sdl = str(schema)
     assert '@identified(by: "@lovekit/stream")' in next(line for line in sdl.splitlines() if line.startswith("type Stream "))
     watch = next(line.strip() for line in sdl.splitlines() if line.strip().startswith("watchStream("))
-    assert watch.endswith("@auth(allow_scoped: true)"), watch
+    assert watch.endswith('@auth(required_scopes: ["lovekit_watch"], allow_scoped: true)'), watch

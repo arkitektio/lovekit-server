@@ -27,6 +27,9 @@ LIVEKIT = {
 # The static token the test HttpContext authenticates as (see tests/conftest.py).
 # Django forces DEBUG=False under the test runner, and authentikate 3.0 refuses static
 # tokens when DEBUG is False. These are deliberate test fixtures, so opt in explicitly.
+#: What a test token is unless it says otherwise: lovekit's admin, through an app granted all of lovekit.
+ADMIN_WITH_EVERY_SCOPE = {"roles": ["lovekit_admin"], "scope": "openid lovekit_all"}
+
 AUTHENTIKATE = {
     **AUTHENTIKATE,
     "allow_static_tokens_in_production": True,
@@ -34,16 +37,21 @@ AUTHENTIKATE = {
     # listed under (tests/test_sharing.py).
     "audience": "1",
     "static_tokens": {
-        "test": {"sub": "1"},
-        # A second, distinct identity for ownership/cross-user denial tests. The
-        # AuthentikateExtension re-resolves the user from the Bearer token at
-        # resolve time, so a different *user* requires a different *token*.
-        "othertest": {"sub": "9"},
-        # The same second user acting in ANOTHER organization, for tenant
-        # scoping tests: a call of static_org must not exist for them.
-        "stranger": {"sub": "9", "org": "another_org"},
-        # The first user running a second app: another client, so another agent.
-        "secondapp": {"sub": "1", "client_id": "secondapp"},
+        name: {**ADMIN_WITH_EVERY_SCOPE, **token}
+        for name, token in {
+            "test": {"sub": "1"},
+            # A second, distinct identity for ownership/cross-user denial tests. The
+            # AuthentikateExtension re-resolves the user from the Bearer token at
+            # resolve time, so a different *user* requires a different *token*.
+            "othertest": {"sub": "9"},
+            # The same second user acting in ANOTHER organization, for tenant
+            # scoping tests: a call of static_org must not exist for them.
+            "stranger": {"sub": "9", "org": "another_org"},
+            # The first user running a second app: another client, so another agent.
+            "secondapp": {"sub": "1", "client_id": "secondapp"},
+            # An app granted only what it watches, for the scope tests (tests/test_scopes.py).
+            "readertest": {"sub": "1", "scope": "openid lovekit_watch"},
+        }.items()
     },
 }
 

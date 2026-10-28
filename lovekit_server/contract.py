@@ -7,9 +7,29 @@ the same commit, and no installer has to learn of it.
 
 from __future__ import annotations
 
-from arkitekt_service.contract import JSON, Contract, Description, Descriptor, Facts, Hosts, Job, Needs, Offers, Signal, Start, Structure, blocks
+from arkitekt_service.contract import JSON, Contract, Description, Descriptor, Facts, Hosts, Job, Needs, Offers, Role, Scope, Signal, Start, Structure, blocks
 
 from lovekit_server.configuration import Settings
+
+#: What an app may do here on a user's behalf: defined at the coordination server when the hub
+#: enrols. Every root field of the schema asks for one of them (`AuthExtension(scopes=...)`).
+SCOPES = [
+    Scope(key="lovekit_watch", description="Watch live streams and agents."),
+    Scope(key="lovekit_publish", description="Stream live video and audio as an agent."),
+    Scope(key="lovekit_call", description="Start and join calls, and invite others to them."),
+    Scope(key="lovekit_share", description="Share streams with people outside your organization through collaborations."),
+    Scope(key="lovekit_all", description="Do everything in Lovekit on your behalf.", is_all_scope=True),
+]
+
+#: What a member of an organization may do here.
+ROLES = [
+    Role(key="lovekit_admin", description="Full control of Lovekit in this organization.", is_admin_role=True),
+    Role(key="lovekit_editor", description="Stream, start calls and share.", is_default_role=True),
+]
+
+#: The role every write asks for, and the one that holds every role.
+EDITOR = "lovekit_editor"
+ADMIN = "lovekit_admin"
 
 
 #: What exists on a hub because this service is there: said here, as data, so the hub knows it from
@@ -61,7 +81,7 @@ contract = Contract(
         name="lovekit",
         identifier="live.arkitekt.lovekit",
         summary="Live video and audio rooms.",
-        needs=Needs(storage=["media"], instance_key=True, peers=["livekit", "rekuest"]),
+        needs=Needs(storage=["media"], instance_key=True, peers=["livekit", "rekuest"], scopes=SCOPES, roles=ROLES),
         offers=Offers(endpoints={"rekuest_service": "_rekuest/service"}),
         requires={"rekuest": ">=6"},
         hosts=HOSTS,
