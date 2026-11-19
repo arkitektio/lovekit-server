@@ -9,7 +9,7 @@ from authentikate.strawberry.extension import AuthentikateExtension
 from authentikate.strawberry import AuthExtension, AuthSubscribeExtension
 from arkitekt_service.collaborations import graphql as collaboration_types
 from arkitekt_service.collaborations.guests import object_scope
-from arkitekt_service.graphql import CollaborationGate, annotate_schema
+from arkitekt_service.graphql import CollaborationGate, TelemetryExtension, annotate_schema
 from django.db.models import Model
 from typing import List
 from kante.types import Info
@@ -144,6 +144,7 @@ schema = Schema(
     subscription=Subscription,
     schema_directives=[],
     extensions=[
+        TelemetryExtension,
         DjangoOptimizerExtension,
         AuthentikateExtension,
         # A guest of the organization is handed only what is in their collaborations.
