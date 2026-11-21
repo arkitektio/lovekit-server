@@ -32,7 +32,13 @@ async def published_tracks(room_name: str, publisher: str) -> set[str]:
         return set()
     finally:
         await client.aclose()
-    return {track.name for participant in response.participants if participant.identity == publisher for track in participant.tracks}
+    # A video or audio stream is a media track, a data stream a data track: both carry the key.
+    return {
+        track.name
+        for participant in response.participants
+        if participant.identity == publisher
+        for track in (*participant.tracks, *participant.data_tracks)
+    }
 
 
 def agent_ids(room_names: set[str]) -> list[int]:

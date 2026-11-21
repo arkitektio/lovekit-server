@@ -1131,15 +1131,15 @@ wheels = [
 
 [[package]]
 name = "livekit-protocol"
-version = "1.0.2"
+version = "1.1.32"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "protobuf" },
     { name = "types-protobuf" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6c/eb/a2bac69a6be3ac1f6a2f6f5e64af8d5d91a8734689b4c1d3dc73ff56d38d/livekit_protocol-1.0.2.tar.gz", hash = "sha256:006dd0de6280681d9e38574a76162bfa826e135a10c1107d21abe52bb7026aef", size = 55697, upload-time = "2025-04-12T10:16:51.754Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/3f/09/3fa7a365894c444773f32e9ef483b0c9e4642891c77b85174d130165a308/livekit_protocol-1.1.32.tar.gz", hash = "sha256:2b2af25d16e65da64b9b16fec8d773a66107bf9c22db58d1ede5f156f42c98a7", size = 135835, upload-time = "2026-11-14T01:13:57.329Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/73/e9/6575dac25f15566e940a1f8c519848829e7db8c630d000c9eca572cc76b5/livekit_protocol-1.0.2-py3-none-any.whl", hash = "sha256:560b15f4d021f052ff95189d3e124cc0e20e24799e01d08c9183344e7ea91114", size = 65999, upload-time = "2025-04-12T10:16:50.391Z" },
+    { url = "https://files.pythonhosted.org/packages/d3/9c/028db5523b4434f98a96079fe5bef51919e290d5ada830c207aec01db7f9/livekit_protocol-1.1.32-py3-none-any.whl", hash = "sha256:f86e104b7a84e743f7e382892d781df4f103eefdbfb24520359158f9c427e032", size = 163639, upload-time = "2026-11-14T01:13:55.948Z" },
 ]
 
 [[package]]
@@ -1164,6 +1164,7 @@ dependencies = [
     { name = "jsonpatch" },
     { name = "koherent" },
     { name = "livekit-api" },
+    { name = "livekit-protocol" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings", extra = ["yaml"] },
     { name = "rich" },
@@ -1205,6 +1206,7 @@ requires-dist = [
     { name = "jsonpatch", specifier = "~=1.33" },
     { name = "koherent", specifier = ">4" },
     { name = "livekit-api", specifier = ">=1.0.2" },
+    { name = "livekit-protocol", specifier = ">=1.1.27" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3" },
     { name = "pydantic-settings", extras = ["yaml"], specifier = ">=2.2" },
     { name = "rich", specifier = ">=14.0.0" },
@@ -1218,7 +1220,7 @@ dev = [
     { name = "basedpyright", specifier = ">=1.39.8" },
     { name = "django-stubs", specifier = ">=5.2.0" },
     { name = "dokker", specifier = ">=2.8" },
-    { name = "livekit", specifier = ">=1.0" },
+    { name = "livekit", specifier = ">=1.1.12" },
     { name = "mypy", specifier = ">=1.15.0" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-asyncio", specifier = ">=1.1.0" },

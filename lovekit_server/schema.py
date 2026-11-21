@@ -103,15 +103,15 @@ class Mutation:
 
     # Agent streams: what an app instance offers live, its own and nobody else's
     declare_streams: List[types.Stream] = mutation(scope="lovekit_publish", resolver=mutations.declare_streams, description="Offer exactly these streams as the caller's agent: undeclared ones are removed, unchanged ones untouched")
-    publish_token: str = mutation(scope="lovekit_publish", resolver=mutations.publish_token, description="A token for the caller's agent to publish its streams; a newer connection replaces an older one")
-    # Watching is open to a guest who has the agent in a collaboration: a token opens the agent's whole room
-    watch_stream: str = watch_mutation(resolver=mutations.watch_stream, description="A token to watch a stream: its agent's room, where it is the track named by its key. A guest needs the agent in one of their collaborations")
-    watch_agent: str = watch_mutation(resolver=mutations.watch_agent, description="A token to watch every stream of an agent. A guest needs the agent in one of their collaborations")
+    publisher_connection: types.Connection = mutation(scope="lovekit_publish", resolver=mutations.publisher_connection, description="What the caller's agent publishes its streams with; a newer connection replaces an older one")
+    # Watching is open to a guest who has the agent in a collaboration: a connection opens the agent's whole room
+    watch_stream: types.Connection = watch_mutation(resolver=mutations.watch_stream, description="What a stream is watched with: its agent's room, where it is the track named by its key. A guest needs the agent in one of their collaborations")
+    watch_agent: types.Connection = watch_mutation(resolver=mutations.watch_agent, description="What every stream of an agent is watched with. A guest needs the agent in one of their collaborations")
 
     # Calls: multi-party rooms about structures
     ensure_call: types.Call = mutation(scope="lovekit_call", resolver=mutations.ensure_call, description="The live call about these structures, or a new one")
     add_to_call: types.Call = mutation(scope="lovekit_call", resolver=mutations.add_to_call, description="Turn a call to these structures: they become what it is about last, and what it was about stays")
-    join_call: str = mutation(scope="lovekit_call", resolver=mutations.join_call, description="Join a call and return the token for it")
+    join_call: types.Connection = mutation(scope="lovekit_call", resolver=mutations.join_call, description="Join a call: what its room is reached with")
     invite_to_call: types.Call = mutation(scope="lovekit_call", resolver=mutations.invite_to_call, description="Ask users into a call; their open apps ring")
     dismiss_call_invite: strawberry.ID = mutation(scope="lovekit_call", resolver=mutations.dismiss_call_invite, description="Put an invitation away, on every device")
 

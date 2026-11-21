@@ -165,3 +165,44 @@ async def test_two_processes_declaring_at_once_make_one_agent(authenticated_cont
     assert errors == []
     assert await Agent.objects.acount() == 1
     assert await sync_to_async(lambda: sorted(Stream.objects.values_list("key", flat=True)))() == ["camera", "overview"]
+
+
+SPECTRUM = {
+    "key": "spectrum",
+    "kind": "DATA",
+    "format": {
+        "dtype": "float16",
+        "shape": [512],
+        "axes": [{"name": "wavelength", "type": "SPECTRUM"}],
+        "calibration": [{"axis": "wavelength", "unit": "nm", "scale": 0.78, "offset": 400.0}],
+        "unit": "counts",
+    },
+}
+
+DECLARE_DATA = """
+mutation ($input: DeclareStreamsInput!) {
+  declareStreams(input: $input) { id kind format { dtype shape unit reference axes { name type } calibration { axis unit scale offset } } }
+}
+"""
+
+
+async def test_a_data_stream_keeps_its_format_and_a_changed_one_is_written(aexecute):
+    res = await aexecute(DECLARE_DATA, {"input": {"streams": [SPECTRUM]}})
+    assert not res.errors, res.errors
+    [stream] = res.data["declareStreams"]
+    assert stream["kind"] == "DATA"
+    assert stream["format"] == {**SPECTRUM["format"], "reference": None}
+
+    with _Writes() as writes:
+        await aexecute(DECLARE_DATA, {"input": {"streams": [SPECTRUM]}})
+        assert writes.seen == []
+        wider = {**SPECTRUM, "format": {**SPECTRUM["format"], "shape": [256]}}
+        await aexecute(DECLARE_DATA, {"input": {"streams": [wider]}})
+        assert writes.seen == [("updated", int(stream["id"]))]
+
+
+async def test_a_frame_of_more_than_a_packet_is_refused(aexecute):
+    large = {**SPECTRUM, "format": {**SPECTRUM["format"], "dtype": "float32"}}
+    res = await aexecute(DECLARE_DATA, {"input": {"streams": [large]}})
+    assert res.errors and "2048 bytes" in res.errors[0].message
+    assert await Stream.objects.acount() == 0

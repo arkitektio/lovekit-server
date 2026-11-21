@@ -14,7 +14,7 @@ import logging
 from asgiref.sync import sync_to_async
 from kante.types import Info
 
-from bridge import calls, inputs, models, tokens, types
+from bridge import calls, enums, inputs, models, tokens, types
 from bridge.channel_signals import CallSignal
 from bridge.channels import call_channel
 from bridge.graphql.mutations.invite import clear_invites_on_join
@@ -127,8 +127,8 @@ async def add_to_call(info: Info, input: inputs.AddToCallInput) -> types.Call:
     return call
 
 
-async def join_call(info: Info, input: inputs.JoinCallInput) -> str:
-    """A token to publish and subscribe in the call's room.
+async def join_call(info: Info, input: inputs.JoinCallInput) -> types.Connection:
+    """What the caller publishes and subscribes with in the call's room.
 
     Scoped first: a call of another organization does not exist for this
     caller. The identity carries a nonce so a second window of the same user
@@ -143,7 +143,7 @@ async def join_call(info: Info, input: inputs.JoinCallInput) -> str:
     # Answered: the invitation stops ringing on the user's other devices too.
     await clear_invites_on_join(info, call)
 
-    return tokens.participant_token(
+    token = tokens.participant_token(
         call.livekit_room_name,
         kind="user",
         id=user.id,
@@ -151,3 +151,4 @@ async def join_call(info: Info, input: inputs.JoinCallInput) -> str:
         can_publish=True,
         can_publish_data=True,
     )
+    return types.Connection(transport=enums.Transport.LIVEKIT, credential=token)

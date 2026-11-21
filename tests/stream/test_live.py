@@ -1,6 +1,6 @@
 """Whether a stream is live is LiveKit's answer: its agent publishes a track named by the stream's key.
 
-These connect to the real LiveKit server of the test stack with the token ``publishToken``
+These connect to the real LiveKit server of the test stack with the credential ``publisherConnection``
 mints, publish real tracks, and read ``live`` back through the schema.
 """
 
@@ -22,7 +22,7 @@ mutation ($input: DeclareStreamsInput!) {
 }
 """
 
-PUBLISH_TOKEN = "mutation { publishToken }"
+PUBLISH_TOKEN = "mutation { publisherConnection { transport credential } }"
 
 LIVE = """
 query ($id: ID!) { stream(id: $id) { live } }
@@ -46,7 +46,8 @@ async def _declare(aexecute, keys, context=None):
 async def _token(aexecute, context=None) -> str:
     res = await aexecute(PUBLISH_TOKEN, context=context)
     assert not res.errors, res.errors
-    return res.data["publishToken"]
+    assert res.data["publisherConnection"]["transport"] == "LIVEKIT"
+    return res.data["publisherConnection"]["credential"]
 
 
 async def _publish(token: str, *names: str) -> tuple[rtc.Room, list[str]]:
@@ -118,6 +119,25 @@ async def test_a_stream_is_live_while_its_track_is_published(aexecute):
         await room.disconnect()
 
     assert await _eventually(lambda: live(camera), False) is False
+
+
+async def test_a_data_stream_is_live_while_its_data_track_is_published(aexecute):
+    spectrum = {"key": "spectrum", "kind": "DATA", "format": {"dtype": "uint8", "shape": [16], "axes": [{"name": "bin", "type": "INDEX"}]}}
+    res = await aexecute(DECLARE, {"input": {"streams": [spectrum]}})
+    assert not res.errors, res.errors
+    [stream] = res.data["declareStreams"]
+
+    async def live() -> bool:
+        return (await aexecute(LIVE, {"id": stream["id"]})).data["stream"]["live"]
+
+    room = rtc.Room()
+    await asyncio.wait_for(room.connect(URL, await _token(aexecute)), 20)
+    try:
+        track = await room.local_participant.publish_data_track(name="spectrum")  # published while it is held
+        assert track.is_published()
+        assert await _eventually(live, True) is True
+    finally:
+        await room.disconnect()
 
 
 async def test_a_restarted_agent_replaces_its_old_connection(aexecute, livekit_client):

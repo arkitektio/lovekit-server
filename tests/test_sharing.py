@@ -28,8 +28,8 @@ mutation ($input: DeclareStreamsInput!) {
 SEEN = "{ agents { id name streams { id key } } streams { id key agent { id } } }"
 STREAM = "query ($id: ID!) { stream(id: $id) { id key } }"
 AGENT = "query ($id: ID!) { agent(id: $id) { id name streams { key } } }"
-WATCH_STREAM = "mutation ($input: WatchStreamInput!) { watchStream(input: $input) }"
-WATCH_AGENT = "mutation ($input: WatchAgentInput!) { watchAgent(input: $input) }"
+WATCH_STREAM = "mutation ($input: WatchStreamInput!) { watchStream(input: $input) { transport credential } }"
+WATCH_AGENT = "mutation ($input: WatchAgentInput!) { watchAgent(input: $input) { transport credential } }"
 ENSURE_CALL = "mutation ($input: EnsureCallInput!) { ensureCall(input: $input) { id } }"
 
 
@@ -143,7 +143,7 @@ async def test_a_guest_watches_a_shared_agent_without_publishing(authenticated_c
 
     watched = await _run(ctx, WATCH_STREAM, input={"stream": camera["id"]})
     assert not watched.errors, watched.errors
-    claims = _claims(watched.data["watchStream"])
+    claims = _claims(watched.data["watchStream"]["credential"])
     assert claims.video.room == camera["agent"]["roomName"]
     assert claims.video.can_subscribe is True
     assert claims.video.can_publish is False
@@ -151,7 +151,7 @@ async def test_a_guest_watches_a_shared_agent_without_publishing(authenticated_c
 
     whole = await _run(ctx, WATCH_AGENT, input={"agent": camera["agent"]["id"]})
     assert not whole.errors, whole.errors
-    assert _claims(whole.data["watchAgent"]).video.room == camera["agent"]["roomName"]
+    assert _claims(whole.data["watchAgent"]["credential"]).video.room == camera["agent"]["roomName"]
 
 
 @pytest.mark.django_db(transaction=True)
@@ -180,9 +180,9 @@ async def test_a_guest_publishes_nothing_joins_no_call_and_hears_nothing(authent
 
     for document, variables in [
         (DECLARE, {"input": {"streams": [{"key": "mine"}]}}),
-        ("mutation { publishToken }", {}),
+        ("mutation { publisherConnection { credential } }", {}),
         (ENSURE_CALL, {"input": {"about": [{"identifier": "@mikro/image", "object": 42}]}}),
-        ("mutation ($input: JoinCallInput!) { joinCall(input: $input) }", {"input": {"call": call_id}}),
+        ("mutation ($input: JoinCallInput!) { joinCall(input: $input) { credential } }", {"input": {"call": call_id}}),
         ("mutation ($input: InviteToCallInput!) { inviteToCall(input: $input) { id } }", {"input": {"call": call_id, "users": ["1"]}}),
         (
             "mutation ($input: CollaborationObjectInput!) { addToCollaboration(input: $input) { id } }",

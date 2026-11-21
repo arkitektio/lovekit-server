@@ -22,7 +22,7 @@ mutation ($input: EnsureCallInput!) {
 
 JOIN_CALL = """
 mutation ($input: JoinCallInput!) {
-  joinCall(input: $input)
+  joinCall(input: $input) { transport credential }
 }
 """
 
@@ -84,7 +84,7 @@ async def test_join_call_mints_a_publishing_token_for_the_room(aexecute):
     res = await aexecute(JOIN_CALL, {"input": {"call": call["id"]}})
     assert not res.errors, res.errors
 
-    claims = jwt.decode(res.data["joinCall"], options={"verify_signature": False})
+    claims = jwt.decode(res.data["joinCall"]["credential"], options={"verify_signature": False})
     assert claims["video"]["room"] == call["roomName"]
     assert claims["video"]["roomJoin"] is True
     assert claims["video"]["canPublish"] is True
@@ -105,7 +105,7 @@ async def test_join_call_twice_gives_two_identities(aexecute):
     second = await aexecute(JOIN_CALL, {"input": {"call": call_id}})
     identity = lambda token: jwt.decode(token, options={"verify_signature": False})["sub"]  # noqa: E731
     # A second window joins beside the first instead of kicking it out.
-    assert identity(first.data["joinCall"]) != identity(second.data["joinCall"])
+    assert identity(first.data["joinCall"]["credential"]) != identity(second.data["joinCall"]["credential"])
 
 
 async def test_calls_about_a_structure_and_their_liveness(aexecute):

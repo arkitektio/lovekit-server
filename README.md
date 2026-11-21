@@ -29,9 +29,9 @@ is scoped to the caller's organization.
 
 | Operations | What they do |
 | --- | --- |
-| `declareStreams` | The caller's agent offers exactly these streams. A stream it declared before keeps its id, one it leaves out is removed, and one that did not change is not written. |
-| `publishToken` | A LiveKit token for the caller's agent to publish into its room (after `declareStreams`). |
-| `watchStream`, `watchAgent` | A LiveKit token to subscribe in the agent's room, but not publish. |
+| `declareStreams` | The caller's agent offers exactly these streams: video, audio, or data with a declared `format` (a frame is at most 1024 bytes). A stream it declared before keeps its id, one it leaves out is removed, and one that did not change is not written. |
+| `publisherConnection` | What the caller's agent publishes into its room with (after `declareStreams`): the transport and its credential. |
+| `watchStream`, `watchAgent` | A connection to subscribe in the agent's room, but not publish. |
 | `streams`, `agents` (and one by id) | The organization's agents and streams; `streams(filters: {live, agent, clientId, userSub})`. |
 | `streams` (subscription) | Streams declared, changed and dropped, as they are (not whether they are live). |
 | `ensureCall`, `addToCall`, `joinCall`, `inviteToCall`, `dismissCallInvite`, `calls`, `call`, `myCallInvites` | Calls. |

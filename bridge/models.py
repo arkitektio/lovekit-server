@@ -49,8 +49,9 @@ class Stream(Described):
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="streams", help_text="The agent that declared this stream")
     key = models.CharField(max_length=200, help_text="The agent's name for this stream, stable across restarts; the name of its LiveKit track")
     title = models.CharField(max_length=1000, help_text="What the stream is called")
-    kind = models.CharField(max_length=50, choices=[(kind.value, kind.name) for kind in enums.StreamKind], help_text="Whether this is video or audio")
+    kind = models.CharField(max_length=50, choices=[(kind.value, kind.name) for kind in enums.StreamKind], help_text="Whether this is video, audio or data")
     description = models.TextField(null=True, blank=True, help_text="What the stream shows")
+    format = models.JSONField(null=True, blank=True, help_text="What a frame of a data stream holds (dtype, shape, axes, calibration); null for video and audio")
     created_at = models.DateTimeField(auto_now_add=True, help_text="When the agent first declared this stream")
 
     class Meta:

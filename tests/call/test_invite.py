@@ -16,7 +16,7 @@ MY_INVITES = """
 query { myCallInvites { id call { id title } inviter { sub } } }
 """
 JOIN_CALL = """
-mutation ($input: JoinCallInput!) { joinCall(input: $input) }
+mutation ($input: JoinCallInput!) { joinCall(input: $input) { transport credential } }
 """
 DISMISS = """
 mutation ($input: DismissCallInviteInput!) { dismissCallInvite(input: $input) }

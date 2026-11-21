@@ -13,11 +13,11 @@ mutation ($input: DeclareStreamsInput!) {
 """
 
 WATCH_STREAM = """
-mutation ($input: WatchStreamInput!) { watchStream(input: $input) }
+mutation ($input: WatchStreamInput!) { watchStream(input: $input) { transport credential } }
 """
 
 WATCH_AGENT = """
-mutation ($input: WatchAgentInput!) { watchAgent(input: $input) }
+mutation ($input: WatchAgentInput!) { watchAgent(input: $input) { transport credential } }
 """
 
 STREAM = "query ($id: ID!) { stream(id: $id) { id } }"
@@ -39,21 +39,21 @@ async def test_a_member_watches_a_stream_without_publishing(aexecute, other_user
     res = await aexecute(WATCH_STREAM, {"input": {"stream": stream["id"]}}, context=other_user_context)
     assert not res.errors, res.errors
 
-    claims = _claims(res.data["watchStream"])
+    claims = _claims(res.data["watchStream"]["credential"])
     assert claims.video.room == stream["agent"]["roomName"]
     assert claims.video.can_subscribe is True
     assert claims.video.can_publish is False
     # A watcher's identity is its own, so two windows watch side by side.
     assert claims.identity.startswith("user-")
     again = await aexecute(WATCH_STREAM, {"input": {"stream": stream["id"]}}, context=other_user_context)
-    assert _claims(again.data["watchStream"]).identity != claims.identity
+    assert _claims(again.data["watchStream"]["credential"]).identity != claims.identity
 
 
 async def test_a_member_watches_a_whole_agent(aexecute, other_user_context):
     stream = await _stream(aexecute)
     res = await aexecute(WATCH_AGENT, {"input": {"agent": stream["agent"]["id"]}}, context=other_user_context)
     assert not res.errors, res.errors
-    assert _claims(res.data["watchAgent"]).video.room == stream["agent"]["roomName"]
+    assert _claims(res.data["watchAgent"]["credential"]).video.room == stream["agent"]["roomName"]
 
 
 async def test_an_agent_is_found_by_its_app(aexecute):

@@ -35,7 +35,7 @@ ADMIN = "lovekit_admin"
 #: What exists on a hub because this service is there: said here, as data, so the hub knows it from
 #: the image. ``service.py`` binds each of these to its model and refuses anything not said here.
 STREAM_DESCRIPTORS = [
-    Descriptor(key="@lovekit/stream_kind", type="STRING", description="What the stream carries: video (pictures, e.g. from a camera) or audio (sound, e.g. from a microphone)"),
+    Descriptor(key="@lovekit/stream_kind", type="STRING", description="What the stream carries: video (pictures, e.g. from a camera), audio (sound, e.g. from a microphone) or data (values, e.g. a spectrum)"),
 ]
 
 HOSTS = Hosts(

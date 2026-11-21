@@ -58,7 +58,37 @@ class Agent:
         return bool(await streams.tracks_loader(info.context).load(_agent_room(self.id)))
 
 
-@strawberry_django.type(models.Stream, filters=filters.StreamFilter, order=filters.StreamOrder, pagination=True, description="One live source an agent offers: a camera, a detector, a microphone")
+@strawberry.type(description="What it takes to reach an agent's streams or a call: the carrier, and what lets the caller in. Where the carrier is, the client knows from its own configuration")
+class Connection:
+    transport: enums.Transport
+    credential: str = strawberry.field(description="What lets the caller in: for LIVEKIT, the access token of its room")
+
+
+@strawberry.type(description="One axis of a data stream's frames")
+class Axis:
+    name: str
+    type: enums.AxisType
+
+
+@strawberry.type(description="What a step along one axis measures: position = offset + scale * index, in unit")
+class Calibration:
+    axis: str
+    unit: str
+    scale: float
+    offset: float
+
+
+@strawberry.type(description="What every frame of a data stream holds")
+class DataFormat:
+    dtype: str = strawberry.field(description="The type of one value, as numpy names it")
+    shape: List[int]
+    axes: List[Axis] = strawberry.field(description="One axis per dimension of the shape, in its order")
+    calibration: List[Calibration]
+    unit: Optional[str] = strawberry.field(description="The unit of the values themselves")
+    reference: Optional[str] = strawberry.field(description="The space the axes are in, named as mikro names a coordinate system's reference")
+
+
+@strawberry_django.type(models.Stream, filters=filters.StreamFilter, order=filters.StreamOrder, pagination=True, description="One live source an agent offers: a camera, a detector, a microphone, a spectrometer")
 class Stream:
     @classmethod
     def get_queryset(cls, queryset, info, **kwargs):
@@ -74,6 +104,20 @@ class Stream:
     created_at: datetime.datetime
     agent: Agent
     descriptors: JSON = kante.django_field(resolver=resolve_descriptors, only=["stored_descriptors", "kind"], description=DESCRIPTORS_DESCRIPTION)
+
+    @strawberry_django.field(only=["format"], description="What a frame holds; only a data stream has one.")
+    def format(self) -> Optional[DataFormat]:
+        stored = self.format
+        if stored is None:
+            return None
+        return DataFormat(
+            dtype=stored["dtype"],
+            shape=stored["shape"],
+            axes=[Axis(name=axis["name"], type=enums.AxisType(axis["type"])) for axis in stored["axes"]],
+            calibration=[Calibration(**calibration) for calibration in stored["calibration"]],
+            unit=stored["unit"],
+            reference=stored["reference"],
+        )
 
     @strawberry_django.field(only=["agent_id", "key"], description="Whether the agent publishes this stream right now: LiveKit's answer, asked when read.")
     async def live(self, info: Info) -> bool:
