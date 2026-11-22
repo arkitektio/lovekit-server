@@ -88,7 +88,9 @@ class Call(models.Model):
 
     One call is one LiveKit room (``livekit_room_name``). Everyone in the
     call's organization may join; whether it is live is LiveKit's answer
-    (the room exists while someone is in it), not a column here.
+    (the room exists while someone is in it). ``ended_at`` is what LiveKit's
+    webhook last told us about the room closing (``bridge.webhooks``): a record
+    of when it ended, for listing, not the source of whether it is live.
     """
 
     title = models.CharField(max_length=1000, help_text="The title of the call")
@@ -107,6 +109,11 @@ class Call(models.Model):
         help_text="The user that started this call",
     )
     created_at = models.DateTimeField(auto_now_add=True, help_text="The time this call was started")
+    ended_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When LiveKit last closed this call's room (its webhook says so); null while it is live or was never seen to end. Cleared when the room comes up again.",
+    )
     about = models.ManyToManyField(
         Structure,
         related_name="calls",

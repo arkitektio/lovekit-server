@@ -1,3 +1,5 @@
+import asyncio
+import contextlib
 import os
 import time
 
@@ -9,7 +11,7 @@ from asgiref.sync import sync_to_async
 from authentikate.models import Client, Organization, User, Membership
 from django.contrib.contenttypes.management import create_contenttypes
 from django.db.models.signals import post_migrate
-from kante.context import HttpContext, UniversalRequest
+from kante.context import HttpContext, UniversalRequest, WsContext
 from strawberry.http.temporal_response import TemporalResponse
 from dokker import testing
 
@@ -195,3 +197,105 @@ async def livekit_client(backend_stack):
     client = get_api()
     yield client
     await client.aclose()
+
+
+# ---------------------------------------------------------------------------
+# Subscriptions, in-process: a websocket context on the in-memory channel layer.
+# ---------------------------------------------------------------------------
+
+
+class Subscriber:
+    """Drives one subscription from a single task, collecting what it yields.
+
+    The AuthentikateExtension sets and resets context variables around the operation,
+    which must happen in the same task; cancelling the task closes the subscription the
+    way a client disconnect would.
+    """
+
+    def __init__(self, context: WsContext, query: str, variables: dict[str, object]) -> None:
+        self.context = context
+        self.query = query
+        self.variables = variables
+        self.events: asyncio.Queue = asyncio.Queue()
+        self.task = asyncio.create_task(self._run())
+
+    async def _run(self) -> None:
+        from lovekit_server.schema import schema
+
+        subscription = await schema.subscribe(self.query, variable_values=self.variables, context_value=self.context)
+        if hasattr(subscription, "errors"):
+            self.events.put_nowait(subscription)
+            return
+        async for result in subscription:
+            self.events.put_nowait(result)
+
+    async def next(self, timeout: float = 5) -> dict:
+        result = await asyncio.wait_for(self.events.get(), timeout)
+        assert not result.errors, result.errors
+        return result.data
+
+    async def nothing(self, timeout: float = 0.5) -> bool:
+        """True when nothing more arrives within ``timeout``."""
+        try:
+            await asyncio.wait_for(self.events.get(), timeout)
+        except asyncio.TimeoutError:
+            return True
+        return False
+
+    async def close(self) -> None:
+        self.task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await self.task
+
+
+@pytest_asyncio.fixture
+async def subscribe(db, backend_stack):
+    """Start a subscription as a static token, once it listens on ``group``; closed after the test.
+
+    One ``ChannelsConsumer`` per subscriber, bound to the in-memory layer, with a pump that
+    feeds the layer's messages into it (what the websocket handler does).
+    """
+    from channels.layers import get_channel_layer
+    from strawberry.channels import ChannelsConsumer
+
+    layer = get_channel_layer()
+    # The in-memory layer is a process-wide singleton; drop what earlier tests left.
+    await layer.flush()
+    pumps: list[asyncio.Task] = []
+    subscribers: list[Subscriber] = []
+
+    async def _start(query: str, variables: dict[str, object], group: str, token: str = "test") -> Subscriber:
+        consumer = ChannelsConsumer()
+        consumer.channel_layer = layer
+        consumer.channel_name = await layer.new_channel()
+
+        async def pump() -> None:
+            while True:
+                await consumer.dispatch(await layer.receive(consumer.channel_name))
+
+        pumps.append(asyncio.create_task(pump()))
+        context = WsContext(
+            request=UniversalRequest(_extensions={"token": token}),
+            response=TemporalResponse(),
+            connection_params={"token": token},
+            consumer=consumer,
+        )
+        subscriber = Subscriber(context, query, variables)
+        subscribers.append(subscriber)
+        for _ in range(500):
+            if subscriber.task.done():
+                subscriber.task.result()
+                pytest.fail(f"subscription ended before listening: {subscriber.events.get_nowait()}")
+            if consumer.channel_name in layer.groups.get(group, {}):
+                return subscriber
+            await asyncio.sleep(0.01)
+        pytest.fail(f"subscription never joined {group}")
+
+    yield _start
+
+    for subscriber in subscribers:
+        await subscriber.close()
+    for task in pumps:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task

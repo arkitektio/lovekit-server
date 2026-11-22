@@ -187,6 +187,20 @@ present, all three fields are required.
 | `api_secret` 🔒 | `LIVEKIT__API_SECRET` | str | **required** | LiveKit API secret. |
 | `api_url` | `LIVEKIT__API_URL` | str | **required** | LiveKit server URL. |
 
+**Webhooks (configured on the LiveKit server, not here).** For apps to hear calls end, people
+join and leave, and streams go live without polling, point the LiveKit server's `webhook` at
+lovekit, signed with this same `api_key`:
+
+```yaml
+webhook:
+  api_key: <livekit.api_key>
+  urls:
+    - http://<lovekit host>/<script name>/livekit/webhook
+```
+
+Without it everything still works; `Call.endedAt` stays null and the `calls` (ended/resumed),
+`callParticipants` and `streams` (live/offline) events never fire.
+
 ### `rekuest_hook` — how streams are announced to the hub's rekuest (optional)
 
 Omit the block and nothing is announced: agents still declare and publish their streams, but

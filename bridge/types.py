@@ -151,6 +151,7 @@ class Call:
     title: str
     created_at: datetime.datetime
     creator: Optional[User]
+    ended_at: Optional[datetime.datetime] = strawberry_django.field(description="When the call's room last closed, everyone gone; null while it is live (or was never seen to end)")
 
     @strawberry_django.field(description="The structures this call is about, oldest first: the last one is what it turned to most recently.")
     def about(self) -> List[Structure]:

@@ -130,7 +130,11 @@ class Subscription:
     )
     calls = subscription(
         resolver=subscriptions.calls,
-        description="The calls others start in your organization as they start, and any call's new topics",
+        description="The calls others start in your organization as they start, any call's new topics, and calls ending and coming back",
+    )
+    call_participants = subscription(
+        resolver=subscriptions.call_participants,
+        description="Who joins and leaves one call, as they do",
     )
 
 
