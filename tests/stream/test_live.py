@@ -12,7 +12,11 @@ from livekit import rtc
 from livekit.api import TokenVerifier
 from livekit.protocol.room import ListParticipantsRequest
 
-pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.asyncio, pytest.mark.docker]
+pytestmark = [
+    pytest.mark.django_db(transaction=True),
+    pytest.mark.asyncio,
+    pytest.mark.docker,
+]
 
 URL = settings.LIVEKIT["API_URL"].replace("http", "ws", 1)
 
@@ -38,7 +42,9 @@ query ($id: ID!) { agent(id: $id) { live streams { key live } } }
 
 
 async def _declare(aexecute, keys, context=None):
-    res = await aexecute(DECLARE, {"input": {"streams": [{"key": key} for key in keys]}}, context=context)
+    res = await aexecute(
+        DECLARE, {"input": {"streams": [{"key": key} for key in keys]}}, context=context
+    )
     assert not res.errors, res.errors
     return res.data["declareStreams"]
 
@@ -54,13 +60,22 @@ async def _publish(token: str, *names: str) -> tuple[rtc.Room, list[str]]:
     """Connect as the agent and publish one small video track per name."""
     room = rtc.Room()
     reasons: list[str] = []
-    room.on("disconnected", lambda reason: reasons.append(rtc.DisconnectReason.Name(reason)))
+    room.on(
+        "disconnected", lambda reason: reasons.append(rtc.DisconnectReason.Name(reason))
+    )
     await asyncio.wait_for(room.connect(URL, token), 20)
     for name in names:
         source = rtc.VideoSource(16, 16)
         track = rtc.LocalVideoTrack.create_video_track(name, source)
-        await asyncio.wait_for(room.local_participant.publish_track(track, rtc.TrackPublishOptions(source=rtc.TrackSource.SOURCE_CAMERA)), 20)
-        source.capture_frame(rtc.VideoFrame(16, 16, rtc.VideoBufferType.RGBA, bytes(16 * 16 * 4)))
+        await asyncio.wait_for(
+            room.local_participant.publish_track(
+                track, rtc.TrackPublishOptions(source=rtc.TrackSource.SOURCE_CAMERA)
+            ),
+            20,
+        )
+        source.capture_frame(
+            rtc.VideoFrame(16, 16, rtc.VideoBufferType.RGBA, bytes(16 * 16 * 4))
+        )
     return room, reasons
 
 
@@ -78,12 +93,19 @@ async def test_the_publish_token_is_the_agents_one_identity(aexecute):
     [stream] = await _declare(aexecute, ["camera"])
     token = await _token(aexecute)
 
-    claims = TokenVerifier(settings.LIVEKIT["API_KEY"], settings.LIVEKIT["API_SECRET"]).verify(token)
+    claims = TokenVerifier(
+        settings.LIVEKIT["API_KEY"], settings.LIVEKIT["API_SECRET"]
+    ).verify(token)
     assert claims.identity == f"agent-{stream['agent']['id']}"
     assert claims.video.room == stream["agent"]["roomName"]
     assert claims.video.can_publish is True
     # Every token of the agent is the same participant: a restart replaces, never duplicates.
-    assert TokenVerifier(settings.LIVEKIT["API_KEY"], settings.LIVEKIT["API_SECRET"]).verify(await _token(aexecute)).identity == claims.identity
+    assert (
+        TokenVerifier(settings.LIVEKIT["API_KEY"], settings.LIVEKIT["API_SECRET"])
+        .verify(await _token(aexecute))
+        .identity
+        == claims.identity
+    )
 
 
 async def test_there_is_no_publish_token_before_a_declaration(aexecute):
@@ -109,7 +131,10 @@ async def test_a_stream_is_live_while_its_track_is_published(aexecute):
 
         agent = await aexecute(AGENT, {"id": camera["agent"]["id"]})
         assert agent.data["agent"]["live"] is True
-        assert agent.data["agent"]["streams"] == [{"key": "camera", "live": True}, {"key": "overview", "live": False}]
+        assert agent.data["agent"]["streams"] == [
+            {"key": "camera", "live": True},
+            {"key": "overview", "live": False},
+        ]
 
         res = await aexecute(STREAMS, {"live": True})
         assert res.data["streams"] == [{"key": "camera", "live": True}]
@@ -122,7 +147,15 @@ async def test_a_stream_is_live_while_its_track_is_published(aexecute):
 
 
 async def test_a_data_stream_is_live_while_its_data_track_is_published(aexecute):
-    spectrum = {"key": "spectrum", "kind": "DATA", "format": {"dtype": "uint8", "shape": [16], "axes": [{"name": "bin", "type": "INDEX"}]}}
+    spectrum = {
+        "key": "spectrum",
+        "kind": "DATA",
+        "format": {
+            "dtype": "uint8",
+            "shape": [16],
+            "axes": [{"name": "bin", "type": "INDEX"}],
+        },
+    }
     res = await aexecute(DECLARE, {"input": {"streams": [spectrum]}})
     assert not res.errors, res.errors
     [stream] = res.data["declareStreams"]
@@ -133,7 +166,9 @@ async def test_a_data_stream_is_live_while_its_data_track_is_published(aexecute)
     room = rtc.Room()
     await asyncio.wait_for(room.connect(URL, await _token(aexecute)), 20)
     try:
-        track = await room.local_participant.publish_data_track(name="spectrum")  # published while it is held
+        track = await room.local_participant.publish_data_track(
+            name="spectrum"
+        )  # published while it is held
         assert track.is_published()
         assert await _eventually(live, True) is True
     finally:
@@ -148,14 +183,22 @@ async def test_a_restarted_agent_replaces_its_old_connection(aexecute, livekit_c
         room = stream["agent"]["roomName"]
 
         async def participants():
-            response = await livekit_client.room.list_participants(ListParticipantsRequest(room=room))
-            return [(p.identity, [t.name for t in p.tracks]) for p in response.participants]
+            response = await livekit_client.room.list_participants(
+                ListParticipantsRequest(room=room)
+            )
+            return [
+                (p.identity, [t.name for t in p.tracks]) for p in response.participants
+            ]
 
         # One participant, publishing one camera: the new process's.
         identity = f"agent-{stream['agent']['id']}"
-        assert await _eventually(participants, [(identity, ["camera"])]) == [(identity, ["camera"])]
+        assert await _eventually(participants, [(identity, ["camera"])]) == [
+            (identity, ["camera"])
+        ]
         # The old process is told why it was let go, so it can stop instead of fighting back.
-        assert await _eventually(lambda: asyncio.sleep(0, old_reasons), ["DUPLICATE_IDENTITY"]) == ["DUPLICATE_IDENTITY"]
+        assert await _eventually(
+            lambda: asyncio.sleep(0, old_reasons), ["DUPLICATE_IDENTITY"]
+        ) == ["DUPLICATE_IDENTITY"]
     finally:
         await new.disconnect()
         await old.disconnect()

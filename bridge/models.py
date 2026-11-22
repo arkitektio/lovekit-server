@@ -6,7 +6,6 @@ from django.db import models
 from bridge import enums
 
 
-
 class Agent(models.Model):
     """An app instance that owns live streams: one per client, user and organization.
 
@@ -16,14 +15,34 @@ class Agent(models.Model):
     the agent publishes into and everyone in its organization may watch.
     """
 
-    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="lovekit_agents", help_text="The client (app instance) this agent runs as")
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="lovekit_agents", help_text="The user this agent runs for")
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="lovekit_agents", help_text="The organization whose members may watch this agent's streams")
-    created_at = models.DateTimeField(auto_now_add=True, help_text="When this agent first declared its streams")
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.CASCADE,
+        related_name="lovekit_agents",
+        help_text="The client (app instance) this agent runs as",
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="lovekit_agents",
+        help_text="The user this agent runs for",
+    )
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="lovekit_agents",
+        help_text="The organization whose members may watch this agent's streams",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, help_text="When this agent first declared its streams"
+    )
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["client", "user", "organization"], name="one_agent_per_client_user_org"),
+            models.UniqueConstraint(
+                fields=["client", "user", "organization"],
+                name="one_agent_per_client_user_org",
+            ),
         ]
 
     @property
@@ -46,19 +65,47 @@ class Stream(Described):
     LiveKit's answer (the agent publishes a track of that name), not a column here.
     """
 
-    agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name="streams", help_text="The agent that declared this stream")
-    key = models.CharField(max_length=200, help_text="The agent's name for this stream, stable across restarts; the name of its LiveKit track")
+    agent = models.ForeignKey(
+        Agent,
+        on_delete=models.CASCADE,
+        related_name="streams",
+        help_text="The agent that declared this stream",
+    )
+    key = models.CharField(
+        max_length=200,
+        help_text="The agent's name for this stream, stable across restarts; the name of its LiveKit track",
+    )
     title = models.CharField(max_length=1000, help_text="What the stream is called")
-    kind = models.CharField(max_length=50, choices=[(kind.value, kind.name) for kind in enums.StreamKind], help_text="Whether this is video, audio or data")
-    description = models.TextField(null=True, blank=True, help_text="What the stream shows")
-    format = models.JSONField(null=True, blank=True, help_text="What a frame of a data stream holds (dtype, shape, axes, calibration); null for video and audio")
-    created_at = models.DateTimeField(auto_now_add=True, help_text="When the agent first declared this stream")
+    kind = models.CharField(
+        max_length=50,
+        choices=[(kind.value, kind.name) for kind in enums.StreamKind],
+        help_text="Whether this is video, audio or data",
+    )
+    description = models.TextField(
+        null=True, blank=True, help_text="What the stream shows"
+    )
+    format = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="What a frame of a data stream holds (dtype, shape, axes, calibration); null for video and audio",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, help_text="When the agent first declared this stream"
+    )
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["agent", "key"], name="one_stream_per_agent_key"),
+            models.UniqueConstraint(
+                fields=["agent", "key"], name="one_stream_per_agent_key"
+            ),
         ]
-        indexes = [GinIndex(fields=["stored_descriptors"], name="bridge_stream_desc_gin", opclasses=["jsonb_path_ops"])]
+        indexes = [
+            GinIndex(
+                fields=["stored_descriptors"],
+                name="bridge_stream_desc_gin",
+                opclasses=["jsonb_path_ops"],
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.title} [{self.key}]"
@@ -75,11 +122,16 @@ class Structure(models.Model):
         max_length=1000,
         help_text="The identifier of the object. Consult the documentation for the format",
     )
-    object = models.PositiveIntegerField(help_text="The object id of the object, on its associated service")
+    object = models.PositiveIntegerField(
+        help_text="The object id of the object, on its associated service"
+    )
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["identifier", "object"], name="Unique structure per identifier and object")
+            models.UniqueConstraint(
+                fields=["identifier", "object"],
+                name="Unique structure per identifier and object",
+            )
         ]
 
 
@@ -108,7 +160,9 @@ class Call(models.Model):
         related_name="created_calls",
         help_text="The user that started this call",
     )
-    created_at = models.DateTimeField(auto_now_add=True, help_text="The time this call was started")
+    created_at = models.DateTimeField(
+        auto_now_add=True, help_text="The time this call was started"
+    )
     ended_at = models.DateTimeField(
         null=True,
         blank=True,
@@ -127,7 +181,6 @@ class Call(models.Model):
         return f"call-{self.id}"
 
 
-
 class CallInvite(models.Model):
     """Someone asking someone else into a call: the invitation their app rings with.
 
@@ -138,7 +191,11 @@ class CallInvite(models.Model):
     """
 
     call = models.ForeignKey(Call, on_delete=models.CASCADE, related_name="invites")
-    inviter = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_call_invites")
-    invitee = models.ForeignKey(User, on_delete=models.CASCADE, related_name="call_invites")
+    inviter = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="sent_call_invites"
+    )
+    invitee = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="call_invites"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     dismissed_at = models.DateTimeField(null=True, blank=True)

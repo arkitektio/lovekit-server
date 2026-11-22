@@ -4,7 +4,11 @@ import pytest
 
 from bridge.models import CallInvite
 
-pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.asyncio, pytest.mark.docker]
+pytestmark = [
+    pytest.mark.django_db(transaction=True),
+    pytest.mark.asyncio,
+    pytest.mark.docker,
+]
 
 ENSURE_CALL = """
 mutation ($input: EnsureCallInput!) { ensureCall(input: $input) { id } }
@@ -55,7 +59,9 @@ async def test_inviting_twice_rings_once(aexecute, other_user_context):
 
 async def test_unknown_people_and_oneself_are_skipped(aexecute):
     call_id = await _call(aexecute)
-    res = await aexecute(INVITE, {"input": {"call": call_id, "users": ["1", "nobody-here"]}})
+    res = await aexecute(
+        INVITE, {"input": {"call": call_id, "users": ["1", "nobody-here"]}}
+    )
     assert not res.errors, res.errors
     assert await CallInvite.objects.filter(call_id=call_id).acount() == 0
 
@@ -64,7 +70,9 @@ async def test_joining_from_any_device_answers_the_invite(aexecute, other_user_c
     call_id = await _call(aexecute)
     await aexecute(INVITE, {"input": {"call": call_id, "users": ["9"]}})
 
-    joined = await aexecute(JOIN_CALL, {"input": {"call": call_id}}, context=other_user_context)
+    joined = await aexecute(
+        JOIN_CALL, {"input": {"call": call_id}}, context=other_user_context
+    )
     assert not joined.errors, joined.errors
 
     theirs = await aexecute(MY_INVITES, context=other_user_context)
@@ -83,7 +91,9 @@ async def test_dismissing_puts_the_invite_away(aexecute, other_user_context):
     still = await aexecute(MY_INVITES, context=other_user_context)
     assert len(still.data["myCallInvites"]) == 1
 
-    gone = await aexecute(DISMISS, {"input": {"id": invite_id}}, context=other_user_context)
+    gone = await aexecute(
+        DISMISS, {"input": {"id": invite_id}}, context=other_user_context
+    )
     assert not gone.errors, gone.errors
     after = await aexecute(MY_INVITES, context=other_user_context)
     assert after.data["myCallInvites"] == []

@@ -32,8 +32,19 @@ from livekit.protocol.models import ParticipantInfo
 from livekit.protocol.webhook import WebhookEvent
 
 from bridge import models
-from bridge.channel_signals import CallInviteSignal, CallParticipantSignal, CallSignal, StreamSignal
-from bridge.channels import call_channel, call_invite_channel, call_participant_channel, participant_group, stream_channel
+from bridge.channel_signals import (
+    CallInviteSignal,
+    CallParticipantSignal,
+    CallSignal,
+    StreamSignal,
+)
+from bridge.channels import (
+    call_channel,
+    call_invite_channel,
+    call_participant_channel,
+    participant_group,
+    stream_channel,
+)
 from bridge.graphql.mutations.call import call_group
 from bridge.graphql.mutations.invite import invite_group
 from bridge.graphql.mutations.stream import stream_group
@@ -50,7 +61,9 @@ def _room_id(room_name: str, prefix: str) -> int | None:
 
 
 def _receiver() -> WebhookReceiver:
-    return WebhookReceiver(TokenVerifier(settings.LIVEKIT["API_KEY"], settings.LIVEKIT["API_SECRET"]))
+    return WebhookReceiver(
+        TokenVerifier(settings.LIVEKIT["API_KEY"], settings.LIVEKIT["API_SECRET"])
+    )
 
 
 # --- calls ---------------------------------------------------------------------------------
@@ -60,25 +73,38 @@ async def _call_ended(call_id: int) -> None:
     """The call's room closed: record it once, announce it, and stop its invitations ringing."""
     now = timezone.now()
     # Only an open call ends: a retried webhook changes nothing and announces nothing.
-    changed = await models.Call.objects.filter(id=call_id, ended_at__isnull=True).aupdate(ended_at=now)
+    changed = await models.Call.objects.filter(
+        id=call_id, ended_at__isnull=True
+    ).aupdate(ended_at=now)
     if not changed:
         return
     call = await models.Call.objects.aget(id=call_id)
-    await call_channel.abroadcast(CallSignal(ended=call.id), [call_group(call.organization_id)])
+    await call_channel.abroadcast(
+        CallSignal(ended=call.id), [call_group(call.organization_id)]
+    )
     # Pending invitations to a call that is over are moot (``myCallInvites`` already leaves
     # them out); every device still ringing hears that they are gone.
-    async for invite in models.CallInvite.objects.filter(call_id=call_id, dismissed_at__isnull=True).select_related("invitee"):
-        await call_invite_channel.abroadcast(CallInviteSignal(delete=invite.id), [invite_group(call.organization_id, invite.invitee)])
+    async for invite in models.CallInvite.objects.filter(
+        call_id=call_id, dismissed_at__isnull=True
+    ).select_related("invitee"):
+        await call_invite_channel.abroadcast(
+            CallInviteSignal(delete=invite.id),
+            [invite_group(call.organization_id, invite.invitee)],
+        )
     logger.info("Call %s ended", call_id)
 
 
 async def _call_started(call_id: int) -> None:
     """The call's room came up. Only news when the call had ended: a new call was announced when it started."""
-    changed = await models.Call.objects.filter(id=call_id, ended_at__isnull=False).aupdate(ended_at=None)
+    changed = await models.Call.objects.filter(
+        id=call_id, ended_at__isnull=False
+    ).aupdate(ended_at=None)
     if not changed:
         return
     call = await models.Call.objects.aget(id=call_id)
-    await call_channel.abroadcast(CallSignal(resumed=call.id), [call_group(call.organization_id)])
+    await call_channel.abroadcast(
+        CallSignal(resumed=call.id), [call_group(call.organization_id)]
+    )
     logger.info("Call %s resumed", call_id)
 
 
@@ -102,8 +128,12 @@ async def _stream_signal(agent_id: int, key: str | None, live: bool) -> None:
     if key is not None:
         streams = streams.filter(key=key)
     async for stream in streams:
-        signal = StreamSignal(live=stream.id) if live else StreamSignal(offline=stream.id)
-        await stream_channel.abroadcast(signal, [stream_group(stream.agent.organization_id)])
+        signal = (
+            StreamSignal(live=stream.id) if live else StreamSignal(offline=stream.id)
+        )
+        await stream_channel.abroadcast(
+            signal, [stream_group(stream.agent.organization_id)]
+        )
 
 
 def _is_publisher(agent_id: int, participant: ParticipantInfo) -> bool:
@@ -126,16 +156,24 @@ async def handle(event: WebhookEvent) -> None:
         elif event.event == "room_started":
             await _call_started(call_id)
         elif event.event in ("participant_joined", "participant_left"):
-            await _participant(call_id, event.participant, left=event.event == "participant_left")
+            await _participant(
+                call_id, event.participant, left=event.event == "participant_left"
+            )
         return
 
     if agent_id is not None:
         if event.event == "room_finished":
             await _stream_signal(agent_id, None, live=False)
-        elif event.event == "participant_left" and _is_publisher(agent_id, event.participant):
+        elif event.event == "participant_left" and _is_publisher(
+            agent_id, event.participant
+        ):
             await _stream_signal(agent_id, None, live=False)
-        elif event.event in ("track_published", "track_unpublished") and _is_publisher(agent_id, event.participant):
-            await _stream_signal(agent_id, event.track.name, live=event.event == "track_published")
+        elif event.event in ("track_published", "track_unpublished") and _is_publisher(
+            agent_id, event.participant
+        ):
+            await _stream_signal(
+                agent_id, event.track.name, live=event.event == "track_published"
+            )
 
 
 @csrf_exempt

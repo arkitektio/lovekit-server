@@ -24,13 +24,21 @@ from arkitekt_service.service import Service, organization_of
 from bridge import models
 from lovekit_server.contract import contract
 
-service = Service("lovekit", hosts=contract.description.hosts, description="Live video and audio: the streams agents offer, and calls.")
+service = Service(
+    "lovekit",
+    hosts=contract.description.hosts,
+    description="Live video and audio: the streams agents offer, and calls.",
+)
 
 
 # --- Structures: what lovekit hosts ---------------------------------------------------
 
 agent = service.structure(models.Agent, "@lovekit/agent")
-stream = service.structure(models.Stream, "@lovekit/stream", describe=lambda stream: {"@lovekit/stream_kind": str(stream.kind)})
+stream = service.structure(
+    models.Stream,
+    "@lovekit/stream",
+    describe=lambda stream: {"@lovekit/stream_kind": str(stream.kind)},
+)
 
 
 # --- Signals: what lovekit announces --------------------------------------------------

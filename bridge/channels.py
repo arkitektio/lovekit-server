@@ -1,5 +1,11 @@
 from kante.channel import build_channel
-from bridge.channel_signals import CallInviteSignal, CallParticipantSignal, CallSignal, StreamSignal
+
+from bridge.channel_signals import (
+    CallInviteSignal,
+    CallParticipantSignal,
+    CallSignal,
+    StreamSignal,
+)
 
 # One group per organization (`stream_group(org)`), on both sides: an agent declaring its
 # streams is news for everyone who may watch them.
@@ -15,7 +21,9 @@ call_channel = build_channel(CallSignal, name="calls")
 
 # One group per call (`participant_group(call)`): who comes and goes is news only for
 # whoever watches that one call.
-call_participant_channel = build_channel(CallParticipantSignal, name="call_participants")
+call_participant_channel = build_channel(
+    CallParticipantSignal, name="call_participants"
+)
 
 
 def participant_group(call_id: int) -> str:

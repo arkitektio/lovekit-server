@@ -4,7 +4,11 @@ import pytest
 from django.conf import settings
 from livekit.api import TokenVerifier
 
-pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.asyncio, pytest.mark.docker]
+pytestmark = [
+    pytest.mark.django_db(transaction=True),
+    pytest.mark.asyncio,
+    pytest.mark.docker,
+]
 
 DECLARE = """
 mutation ($input: DeclareStreamsInput!) {
@@ -25,7 +29,9 @@ STREAMS = "{ streams { id } agents { id } }"
 
 
 def _claims(token: str):
-    return TokenVerifier(settings.LIVEKIT["API_KEY"], settings.LIVEKIT["API_SECRET"]).verify(token)
+    return TokenVerifier(
+        settings.LIVEKIT["API_KEY"], settings.LIVEKIT["API_SECRET"]
+    ).verify(token)
 
 
 async def _stream(aexecute):
@@ -34,9 +40,13 @@ async def _stream(aexecute):
     return res.data["declareStreams"][0]
 
 
-async def test_a_member_watches_a_stream_without_publishing(aexecute, other_user_context):
+async def test_a_member_watches_a_stream_without_publishing(
+    aexecute, other_user_context
+):
     stream = await _stream(aexecute)
-    res = await aexecute(WATCH_STREAM, {"input": {"stream": stream["id"]}}, context=other_user_context)
+    res = await aexecute(
+        WATCH_STREAM, {"input": {"stream": stream["id"]}}, context=other_user_context
+    )
     assert not res.errors, res.errors
 
     claims = _claims(res.data["watchStream"]["credential"])
@@ -45,15 +55,24 @@ async def test_a_member_watches_a_stream_without_publishing(aexecute, other_user
     assert claims.video.can_publish is False
     # A watcher's identity is its own, so two windows watch side by side.
     assert claims.identity.startswith("user-")
-    again = await aexecute(WATCH_STREAM, {"input": {"stream": stream["id"]}}, context=other_user_context)
+    again = await aexecute(
+        WATCH_STREAM, {"input": {"stream": stream["id"]}}, context=other_user_context
+    )
     assert _claims(again.data["watchStream"]["credential"]).identity != claims.identity
 
 
 async def test_a_member_watches_a_whole_agent(aexecute, other_user_context):
     stream = await _stream(aexecute)
-    res = await aexecute(WATCH_AGENT, {"input": {"agent": stream["agent"]["id"]}}, context=other_user_context)
+    res = await aexecute(
+        WATCH_AGENT,
+        {"input": {"agent": stream["agent"]["id"]}},
+        context=other_user_context,
+    )
     assert not res.errors, res.errors
-    assert _claims(res.data["watchAgent"]["credential"]).video.room == stream["agent"]["roomName"]
+    assert (
+        _claims(res.data["watchAgent"]["credential"]).video.room
+        == stream["agent"]["roomName"]
+    )
 
 
 async def test_an_agent_is_found_by_its_app(aexecute):
@@ -62,8 +81,13 @@ async def test_an_agent_is_found_by_its_app(aexecute):
     res = await aexecute('{ agents(filters: { search: "stat" }) { id name } }')
     assert not res.errors, res.errors
     assert res.data["agents"] == [{"id": stream["agent"]["id"], "name": "static"}]
-    res = await aexecute('{ agents(filters: { clientId: "static", userSub: "1" }) { id } streams(filters: { clientId: "static", userSub: "1" }) { id } }')
-    assert res.data == {"agents": [{"id": stream["agent"]["id"]}], "streams": [{"id": stream["id"]}]}
+    res = await aexecute(
+        '{ agents(filters: { clientId: "static", userSub: "1" }) { id } streams(filters: { clientId: "static", userSub: "1" }) { id } }'
+    )
+    assert res.data == {
+        "agents": [{"id": stream["agent"]["id"]}],
+        "streams": [{"id": stream["id"]}],
+    }
 
 
 async def test_another_organization_sees_no_stream(aexecute, stranger_context):

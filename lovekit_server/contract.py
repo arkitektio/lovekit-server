@@ -7,7 +7,23 @@ the same commit, and no installer has to learn of it.
 
 from __future__ import annotations
 
-from arkitekt_service.contract import JSON, Contract, Description, Descriptor, Facts, Hosts, Job, Needs, Offers, Role, Scope, Signal, Start, Structure, blocks
+from arkitekt_service.contract import (
+    JSON,
+    Contract,
+    Description,
+    Descriptor,
+    Facts,
+    Hosts,
+    Job,
+    Needs,
+    Offers,
+    Role,
+    Scope,
+    Signal,
+    Start,
+    Structure,
+    blocks,
+)
 
 from lovekit_server.configuration import Settings
 
@@ -15,16 +31,36 @@ from lovekit_server.configuration import Settings
 #: enrols. Every root field of the schema asks for one of them (`AuthExtension(scopes=...)`).
 SCOPES = [
     Scope(key="lovekit_watch", description="Watch live streams and agents."),
-    Scope(key="lovekit_publish", description="Stream live video and audio as an agent."),
-    Scope(key="lovekit_call", description="Start and join calls, and invite others to them."),
-    Scope(key="lovekit_share", description="Share streams with people outside your organization through collaborations."),
-    Scope(key="lovekit_all", description="Do everything in Lovekit on your behalf.", is_all_scope=True),
+    Scope(
+        key="lovekit_publish", description="Stream live video and audio as an agent."
+    ),
+    Scope(
+        key="lovekit_call",
+        description="Start and join calls, and invite others to them.",
+    ),
+    Scope(
+        key="lovekit_share",
+        description="Share streams with people outside your organization through collaborations.",
+    ),
+    Scope(
+        key="lovekit_all",
+        description="Do everything in Lovekit on your behalf.",
+        is_all_scope=True,
+    ),
 ]
 
 #: What a member of an organization may do here.
 ROLES = [
-    Role(key="lovekit_admin", description="Full control of Lovekit in this organization.", is_admin_role=True),
-    Role(key="lovekit_editor", description="Stream, start calls and share.", is_default_role=True),
+    Role(
+        key="lovekit_admin",
+        description="Full control of Lovekit in this organization.",
+        is_admin_role=True,
+    ),
+    Role(
+        key="lovekit_editor",
+        description="Stream, start calls and share.",
+        is_default_role=True,
+    ),
 ]
 
 #: The role every write asks for, and the one that holds every role.
@@ -35,7 +71,11 @@ ADMIN = "lovekit_admin"
 #: What exists on a hub because this service is there: said here, as data, so the hub knows it from
 #: the image. ``service.py`` binds each of these to its model and refuses anything not said here.
 STREAM_DESCRIPTORS = [
-    Descriptor(key="@lovekit/stream_kind", type="STRING", description="What the stream carries: video (pictures, e.g. from a camera), audio (sound, e.g. from a microphone) or data (values, e.g. a spectrum)"),
+    Descriptor(
+        key="@lovekit/stream_kind",
+        type="STRING",
+        description="What the stream carries: video (pictures, e.g. from a camera), audio (sound, e.g. from a microphone) or data (values, e.g. a spectrum)",
+    ),
 ]
 
 HOSTS = Hosts(
@@ -68,7 +108,11 @@ def render(facts: Facts) -> dict[str, JSON]:
     document: dict[str, JSON] = blocks.server(facts)
     livekit = facts.peers.get("livekit")
     if livekit is not None:
-        document["livekit"] = {"api_key": livekit.settings["api_key"], "api_secret": livekit.settings["api_secret"], "api_url": livekit.url}
+        document["livekit"] = {
+            "api_key": livekit.settings["api_key"],
+            "api_secret": livekit.settings["api_secret"],
+            "api_url": livekit.url,
+        }
     document["instance"] = blocks.instance(facts)
     hook = blocks.rekuest_hook(facts)
     if hook is not None:
@@ -81,7 +125,13 @@ contract = Contract(
         name="lovekit",
         identifier="live.arkitekt.lovekit",
         summary="Live video and audio rooms.",
-        needs=Needs(storage=["media"], instance_key=True, peers=["livekit", "rekuest"], scopes=SCOPES, roles=ROLES),
+        needs=Needs(
+            storage=["media"],
+            instance_key=True,
+            peers=["livekit", "rekuest"],
+            scopes=SCOPES,
+            roles=ROLES,
+        ),
         offers=Offers(endpoints={"rekuest_service": "_rekuest/service"}),
         requires={"rekuest": ">=6"},
         hosts=HOSTS,
@@ -90,10 +140,23 @@ contract = Contract(
     render=render,
     # How this service is started: there is no script beside it. `arkitekt-service serve`
     # (and `debug`) become these, so they get the container's signals themselves.
-    serve=Start(("daphne", "-b", "0.0.0.0", "-p", "80", "--websocket_timeout", "-1", "lovekit_server.asgi:application")),
+    serve=Start(
+        (
+            "daphne",
+            "-b",
+            "0.0.0.0",
+            "-p",
+            "80",
+            "--websocket_timeout",
+            "-1",
+            "lovekit_server.asgi:application",
+        )
+    ),
     debug=Start(("python", "manage.py", "runserver", "0.0.0.0:80")),
     jobs={
-        "ensureadmin": Job(("ensureadmin",), "Create the operator account the config names"),
+        "ensureadmin": Job(
+            ("ensureadmin",), "Create the operator account the config names"
+        ),
     },
     setup=("ensureadmin",),
 )

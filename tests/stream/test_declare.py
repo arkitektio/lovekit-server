@@ -13,7 +13,11 @@ from django.db.models.signals import post_delete, post_save
 
 from bridge.models import Agent, Stream
 
-pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.asyncio, pytest.mark.docker]
+pytestmark = [
+    pytest.mark.django_db(transaction=True),
+    pytest.mark.asyncio,
+    pytest.mark.docker,
+]
 
 
 DECLARE = """
@@ -59,7 +63,10 @@ class _Writes:
 async def test_an_agent_declares_its_streams(aexecute):
     streams = await _declare(aexecute, CAMERAS)
 
-    assert [(s["key"], s["title"], s["kind"]) for s in streams] == [("camera", "Main camera", "VIDEO"), ("overview", "Overview", "VIDEO")]
+    assert [(s["key"], s["title"], s["kind"]) for s in streams] == [
+        ("camera", "Main camera", "VIDEO"),
+        ("overview", "Overview", "VIDEO"),
+    ]
     assert streams[1]["description"] == "The whole stage"
     # One agent, one room, both streams in it.
     assert streams[0]["agent"] == streams[1]["agent"]
@@ -88,7 +95,10 @@ async def test_a_restart_with_the_same_streams_writes_nothing(aexecute):
 
 async def test_what_changed_is_saved_and_nothing_else(aexecute):
     first = await _declare(aexecute, CAMERAS)
-    changed = [{"key": "camera", "title": "Main camera"}, {"key": "overview", "title": "The stage", "description": "The whole stage"}]
+    changed = [
+        {"key": "camera", "title": "Main camera"},
+        {"key": "overview", "title": "The stage", "description": "The whole stage"},
+    ]
     with _Writes() as writes:
         again = await _declare(aexecute, changed)
     assert writes.seen == [("updated", int(first[1]["id"]))]
@@ -98,7 +108,9 @@ async def test_what_changed_is_saved_and_nothing_else(aexecute):
 async def test_a_stream_left_out_is_removed(aexecute):
     first = await _declare(aexecute, CAMERAS)
     with _Writes() as writes:
-        again = await _declare(aexecute, [{"key": "camera", "title": "Main camera"}, {"key": "detector"}])
+        again = await _declare(
+            aexecute, [{"key": "camera", "title": "Main camera"}, {"key": "detector"}]
+        )
     assert [s["key"] for s in again] == ["camera", "detector"]
     assert ("deleted", int(first[1]["id"])) in writes.seen
     assert not await Stream.objects.filter(id=first[1]["id"]).aexists()
@@ -113,7 +125,9 @@ async def test_declaring_nothing_removes_every_stream(aexecute):
 
 
 async def test_a_key_is_declared_once(aexecute):
-    res = await aexecute(DECLARE, {"input": {"streams": [{"key": "camera"}, {"key": "camera"}]}})
+    res = await aexecute(
+        DECLARE, {"input": {"streams": [{"key": "camera"}, {"key": "camera"}]}}
+    )
     assert res.errors and "camera" in res.errors[0].message
     assert await Stream.objects.acount() == 0
 
@@ -131,7 +145,9 @@ async def test_another_app_is_another_agent(aexecute, second_app_context):
     assert await Stream.objects.acount() == 4
 
 
-async def test_another_user_of_the_same_app_is_another_agent(aexecute, other_user_context):
+async def test_another_user_of_the_same_app_is_another_agent(
+    aexecute, other_user_context
+):
     mine = await _declare(aexecute, CAMERAS)
     theirs = await _declare(aexecute, [{"key": "camera"}], context=other_user_context)
     assert mine[0]["agent"]["id"] != theirs[0]["agent"]["id"]
@@ -150,7 +166,11 @@ async def test_two_processes_declaring_at_once_make_one_agent(authenticated_cont
     def declare() -> None:
         try:
             barrier.wait()
-            res = async_to_sync(schema.execute)(DECLARE, variable_values={"input": {"streams": CAMERAS}}, context_value=authenticated_context)
+            res = async_to_sync(schema.execute)(
+                DECLARE,
+                variable_values={"input": {"streams": CAMERAS}},
+                context_value=authenticated_context,
+            )
             if res.errors:
                 errors.extend(res.errors)
         finally:
@@ -164,7 +184,9 @@ async def test_two_processes_declaring_at_once_make_one_agent(authenticated_cont
 
     assert errors == []
     assert await Agent.objects.acount() == 1
-    assert await sync_to_async(lambda: sorted(Stream.objects.values_list("key", flat=True)))() == ["camera", "overview"]
+    assert await sync_to_async(
+        lambda: sorted(Stream.objects.values_list("key", flat=True))
+    )() == ["camera", "overview"]
 
 
 SPECTRUM = {
@@ -174,7 +196,9 @@ SPECTRUM = {
         "dtype": "float16",
         "shape": [512],
         "axes": [{"name": "wavelength", "type": "SPECTRUM"}],
-        "calibration": [{"axis": "wavelength", "unit": "nm", "scale": 0.78, "offset": 400.0}],
+        "calibration": [
+            {"axis": "wavelength", "unit": "nm", "scale": 0.78, "offset": 400.0}
+        ],
         "unit": "counts",
     },
 }

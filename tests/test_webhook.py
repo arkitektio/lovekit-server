@@ -24,7 +24,11 @@ from bridge.graphql.mutations.invite import invite_group
 from bridge.graphql.mutations.stream import stream_group
 from bridge.models import Call, CallInvite, User
 
-pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.asyncio, pytest.mark.docker]
+pytestmark = [
+    pytest.mark.django_db(transaction=True),
+    pytest.mark.asyncio,
+    pytest.mark.docker,
+]
 
 ENSURE_CALL = "mutation ($input: EnsureCallInput!) { ensureCall(input: $input) { id } }"
 INVITE = "mutation ($input: InviteToCallInput!) { inviteToCall(input: $input) { id } }"
@@ -34,7 +38,9 @@ CALL = "query ($id: ID!) { call(id: $id) { endedAt } }"
 CALLS = "subscription { calls { create { id } update { id } ended { id endedAt } resumed { id endedAt } } }"
 INVITES = "subscription { callInvites { create { id } delete } }"
 PARTICIPANTS = "subscription ($call: ID!) { callParticipants(call: $call) { joined { identity name } left { identity } } }"
-STREAMS = "subscription { streams { create { id } live { id key } offline { id key } } }"
+STREAMS = (
+    "subscription { streams { create { id } live { id key } offline { id key } } }"
+)
 
 IMAGE = {"identifier": "@mikro/image", "object": 42}
 
@@ -42,12 +48,18 @@ IMAGE = {"identifier": "@mikro/image", "object": 42}
 def _signed(event: WebhookEvent, secret: str | None = None) -> tuple[str, str]:
     """The body and the Authorization header LiveKit would send for ``event``."""
     body = MessageToJson(event)
-    token = AccessToken(settings.LIVEKIT["API_KEY"], secret or settings.LIVEKIT["API_SECRET"])
-    token.claims.sha256 = base64.b64encode(hashlib.sha256(body.encode()).digest()).decode()
+    token = AccessToken(
+        settings.LIVEKIT["API_KEY"], secret or settings.LIVEKIT["API_SECRET"]
+    )
+    token.claims.sha256 = base64.b64encode(
+        hashlib.sha256(body.encode()).digest()
+    ).decode()
     return body, token.to_jwt()
 
 
-async def _post(event: WebhookEvent, secret: str | None = None, body: str | None = None) -> int:
+async def _post(
+    event: WebhookEvent, secret: str | None = None, body: str | None = None
+) -> int:
     signed_body, auth = _signed(event, secret)
     response = await AsyncClient().post(
         reverse("livekit-webhook"),
@@ -58,10 +70,18 @@ async def _post(event: WebhookEvent, secret: str | None = None, body: str | None
     return response.status_code
 
 
-def _event(kind: str, room: str, participant: str | None = None, name: str = "", track: str | None = None) -> WebhookEvent:
+def _event(
+    kind: str,
+    room: str,
+    participant: str | None = None,
+    name: str = "",
+    track: str | None = None,
+) -> WebhookEvent:
     event = WebhookEvent(event=kind, room=Room(name=room), id=f"EV_{kind}_{room}")
     if participant is not None:
-        event.participant.CopyFrom(ParticipantInfo(identity=participant, name=name, joined_at=1_700_000_000))
+        event.participant.CopyFrom(
+            ParticipantInfo(identity=participant, name=name, joined_at=1_700_000_000)
+        )
     if track is not None:
         event.track.CopyFrom(TrackInfo(name=track, sid=f"TR_{track}"))
     return event
@@ -80,11 +100,18 @@ async def test_an_unsigned_or_forged_event_changes_nothing(aexecute):
     call_id = await _call(aexecute)
     event = _event("room_finished", f"call-{call_id}")
 
-    no_header = await AsyncClient().post(reverse("livekit-webhook"), data=MessageToJson(event), content_type="application/webhook+json")
+    no_header = await AsyncClient().post(
+        reverse("livekit-webhook"),
+        data=MessageToJson(event),
+        content_type="application/webhook+json",
+    )
     assert no_header.status_code == 401
     assert await _post(event, secret="not-the-secret") == 401
     # Signed for another body: the hash no longer matches.
-    assert await _post(event, body=MessageToJson(_event("room_finished", "call-999999"))) == 401
+    assert (
+        await _post(event, body=MessageToJson(_event("room_finished", "call-999999")))
+        == 401
+    )
 
     assert (await Call.objects.aget(id=call_id)).ended_at is None
 
@@ -92,7 +119,9 @@ async def test_an_unsigned_or_forged_event_changes_nothing(aexecute):
 # --- calls ----------------------------------------------------------------------------------
 
 
-async def test_a_closed_room_ends_the_call_once_and_stops_its_invitations(aexecute, authenticated_context, other_user_context, subscribe):
+async def test_a_closed_room_ends_the_call_once_and_stops_its_invitations(
+    aexecute, authenticated_context, other_user_context, subscribe
+):
     call_id = await _call(aexecute)
     res = await aexecute(INVITE, {"input": {"call": call_id, "users": ["9"]}})
     assert not res.errors, res.errors
@@ -101,7 +130,9 @@ async def test_a_closed_room_ends_the_call_once_and_stops_its_invitations(aexecu
 
     organization = authenticated_context.request.organization
     calls = await subscribe(CALLS, {}, call_group(organization))
-    invites = await subscribe(INVITES, {}, invite_group(organization, invitee), token="othertest")
+    invites = await subscribe(
+        INVITES, {}, invite_group(organization, invitee), token="othertest"
+    )
 
     assert await _post(_event("room_finished", f"call-{call_id}")) == 200
 
@@ -117,9 +148,13 @@ async def test_a_closed_room_ends_the_call_once_and_stops_its_invitations(aexecu
     assert await invites.nothing()
 
 
-async def test_a_room_coming_back_resumes_an_ended_call_and_only_that(aexecute, authenticated_context, subscribe):
+async def test_a_room_coming_back_resumes_an_ended_call_and_only_that(
+    aexecute, authenticated_context, subscribe
+):
     call_id = await _call(aexecute)
-    calls = await subscribe(CALLS, {}, call_group(authenticated_context.request.organization))
+    calls = await subscribe(
+        CALLS, {}, call_group(authenticated_context.request.organization)
+    )
 
     # A call's room starting the first time is not news: ``ensureCall`` announced it.
     assert await _post(_event("room_started", f"call-{call_id}")) == 200
@@ -134,22 +169,59 @@ async def test_a_room_coming_back_resumes_an_ended_call_and_only_that(aexecute, 
     assert (await Call.objects.aget(id=call_id)).ended_at is None
 
 
-async def test_watchers_of_a_call_hear_who_joins_and_leaves_it_and_no_other_call(aexecute, subscribe):
+async def test_watchers_of_a_call_hear_who_joins_and_leaves_it_and_no_other_call(
+    aexecute, subscribe
+):
     call_id = await _call(aexecute)
-    other_id = (await aexecute(ENSURE_CALL, {"input": {"about": [{"identifier": "@mikro/image", "object": 7}]}})).data["ensureCall"]["id"]
-    watcher = await subscribe(PARTICIPANTS, {"call": call_id}, participant_group(int(call_id)))
+    other_id = (
+        await aexecute(
+            ENSURE_CALL,
+            {"input": {"about": [{"identifier": "@mikro/image", "object": 7}]}},
+        )
+    ).data["ensureCall"]["id"]
+    watcher = await subscribe(
+        PARTICIPANTS, {"call": call_id}, participant_group(int(call_id))
+    )
 
-    assert await _post(_event("participant_joined", f"call-{call_id}", participant="user-1-abc", name="Ada")) == 200
-    assert (await watcher.next())["callParticipants"] == {"joined": {"identity": "user-1-abc", "name": "Ada"}, "left": None}
+    assert (
+        await _post(
+            _event(
+                "participant_joined",
+                f"call-{call_id}",
+                participant="user-1-abc",
+                name="Ada",
+            )
+        )
+        == 200
+    )
+    assert (await watcher.next())["callParticipants"] == {
+        "joined": {"identity": "user-1-abc", "name": "Ada"},
+        "left": None,
+    }
 
-    assert await _post(_event("participant_joined", f"call-{other_id}", participant="user-9-xyz")) == 200
+    assert (
+        await _post(
+            _event("participant_joined", f"call-{other_id}", participant="user-9-xyz")
+        )
+        == 200
+    )
     assert await watcher.nothing()
 
-    assert await _post(_event("participant_left", f"call-{call_id}", participant="user-1-abc")) == 200
-    assert (await watcher.next())["callParticipants"] == {"joined": None, "left": {"identity": "user-1-abc"}}
+    assert (
+        await _post(
+            _event("participant_left", f"call-{call_id}", participant="user-1-abc")
+        )
+        == 200
+    )
+    assert (await watcher.next())["callParticipants"] == {
+        "joined": None,
+        "left": {"identity": "user-1-abc"},
+    }
 
 
-async def test_a_call_of_another_organization_cannot_be_watched(aexecute, backend_stack):
+async def test_a_call_of_another_organization_cannot_be_watched(
+    aexecute, backend_stack
+):
     from channels.layers import get_channel_layer
     from kante.context import UniversalRequest, WsContext
     from strawberry.channels import ChannelsConsumer
@@ -167,7 +239,9 @@ async def test_a_call_of_another_organization_cannot_be_watched(aexecute, backen
         connection_params={"token": "stranger"},
         consumer=consumer,
     )
-    subscription = await schema.subscribe(PARTICIPANTS, variable_values={"call": call_id}, context_value=context)
+    subscription = await schema.subscribe(
+        PARTICIPANTS, variable_values={"call": call_id}, context_value=context
+    )
     results = [result async for result in subscription]
     assert results and results[0].errors
     assert participant_group(int(call_id)) not in consumer.channel_layer.groups
@@ -176,24 +250,53 @@ async def test_a_call_of_another_organization_cannot_be_watched(aexecute, backen
 # --- streams --------------------------------------------------------------------------------
 
 
-async def test_an_agents_tracks_make_its_streams_live_and_offline(aexecute, authenticated_context, subscribe):
-    res = await aexecute(DECLARE, {"input": {"streams": [{"key": "camera"}, {"key": "detector"}]}})
+async def test_an_agents_tracks_make_its_streams_live_and_offline(
+    aexecute, authenticated_context, subscribe
+):
+    res = await aexecute(
+        DECLARE, {"input": {"streams": [{"key": "camera"}, {"key": "detector"}]}}
+    )
     assert not res.errors, res.errors
     streams = {stream["key"]: stream["id"] for stream in res.data["declareStreams"]}
     agent_id = res.data["declareStreams"][0]["agent"]["id"]
     room = f"agent-{agent_id}"
     publisher = f"agent-{agent_id}"
-    events = await subscribe(STREAMS, {}, stream_group(authenticated_context.request.organization))
+    events = await subscribe(
+        STREAMS, {}, stream_group(authenticated_context.request.organization)
+    )
 
-    assert await _post(_event("track_published", room, participant=publisher, track="camera")) == 200
-    assert (await events.next())["streams"]["live"] == {"id": streams["camera"], "key": "camera"}
+    assert (
+        await _post(
+            _event("track_published", room, participant=publisher, track="camera")
+        )
+        == 200
+    )
+    assert (await events.next())["streams"]["live"] == {
+        "id": streams["camera"],
+        "key": "camera",
+    }
 
     # A watcher in the agent's room publishing something makes nothing live.
-    assert await _post(_event("track_published", room, participant="viewer-1-abc", track="detector")) == 200
+    assert (
+        await _post(
+            _event(
+                "track_published", room, participant="viewer-1-abc", track="detector"
+            )
+        )
+        == 200
+    )
     assert await events.nothing()
 
-    assert await _post(_event("track_unpublished", room, participant=publisher, track="camera")) == 200
-    assert (await events.next())["streams"]["offline"] == {"id": streams["camera"], "key": "camera"}
+    assert (
+        await _post(
+            _event("track_unpublished", room, participant=publisher, track="camera")
+        )
+        == 200
+    )
+    assert (await events.next())["streams"]["offline"] == {
+        "id": streams["camera"],
+        "key": "camera",
+    }
 
     # The agent leaving takes every stream of it offline.
     assert await _post(_event("participant_left", room, participant=publisher)) == 200
@@ -201,8 +304,12 @@ async def test_an_agents_tracks_make_its_streams_live_and_offline(aexecute, auth
     assert offline == {"camera", "detector"}
 
 
-async def test_rooms_lovekit_does_not_own_are_acknowledged_and_ignored(aexecute, authenticated_context, subscribe):
-    calls = await subscribe(CALLS, {}, call_group(authenticated_context.request.organization))
+async def test_rooms_lovekit_does_not_own_are_acknowledged_and_ignored(
+    aexecute, authenticated_context, subscribe
+):
+    calls = await subscribe(
+        CALLS, {}, call_group(authenticated_context.request.organization)
+    )
     assert await _post(_event("room_finished", "somebody-elses-room")) == 200
     assert await _post(_event("egress_started", "call-1")) == 200
     assert await calls.nothing()

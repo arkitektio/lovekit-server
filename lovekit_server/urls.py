@@ -15,19 +15,18 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
-from django.contrib import admin
-from django.urls import include
-from .schema import schema
-from django.contrib import admin
-from django.urls import include
-from .schema import schema
-from kante.path import dynamicpath
-from django.http import HttpResponse
 from arkitekt_service.service.views import answers_challenge
-from health_check.views import MainView
+from django.contrib import admin
+from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
-from lovekit_server.service import service as rekuest_service
+from health_check.views import MainView
+from kante.path import dynamicpath
+
 from bridge.webhooks import livekit_webhook
+from lovekit_server.service import service as rekuest_service
+
+from .schema import schema
+
 
 def fakts_challenge(request):
     """
@@ -44,7 +43,9 @@ def graphql_schema(request):
 urlpatterns = [
     dynamicpath("admin/", admin.site.urls),
     dynamicpath("schema", graphql_schema),
-    dynamicpath("ht", answers_challenge(csrf_exempt(MainView.as_view())), name="health_check"),
+    dynamicpath(
+        "ht", answers_challenge(csrf_exempt(MainView.as_view())), name="health_check"
+    ),
     dynamicpath(".well-known/fakts-challenge", fakts_challenge, name="fakts-challenge"),
     # LiveKit's webhooks: rooms closing, people joining and leaving, tracks published. Signed
     # with the API key and secret, so it needs no other authentication.

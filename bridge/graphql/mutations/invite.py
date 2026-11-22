@@ -30,16 +30,23 @@ def invite_group(organization, invitee: models.User) -> str:
 
 
 @sync_to_async
-def _create_invites(info: Info, input: inputs.InviteToCallInput) -> tuple[models.Call, list[models.CallInvite]]:
+def _create_invites(
+    info: Info, input: inputs.InviteToCallInput
+) -> tuple[models.Call, list[models.CallInvite]]:
     request = info.context.request
     call = models.Call.objects.get(id=input.call, organization=request.organization)
     # Only people lovekit knows: an app that has talked to lovekit once. An
     # unknown sub has no app to ring, so it is skipped rather than invented.
-    invitees = models.User.objects.filter(sub__in=[str(sub) for sub in input.users], iss=request.user.iss).exclude(id=request.user.id)
+    invitees = models.User.objects.filter(
+        sub__in=[str(sub) for sub in input.users], iss=request.user.iss
+    ).exclude(id=request.user.id)
     created = []
     for invitee in invitees:
         invite, is_new = models.CallInvite.objects.get_or_create(
-            call=call, invitee=invitee, dismissed_at=None, defaults={"inviter": request.user}
+            call=call,
+            invitee=invitee,
+            dismissed_at=None,
+            defaults={"inviter": request.user},
         )
         if is_new:
             created.append(invite)
@@ -52,7 +59,8 @@ async def invite_to_call(info: Info, input: inputs.InviteToCallInput) -> types.C
     for invite in created:
         invitee = await models.User.objects.aget(id=invite.invitee_id)
         await call_invite_channel.abroadcast(
-            CallInviteSignal(create=invite.id), [invite_group(call.organization_id, invitee)]
+            CallInviteSignal(create=invite.id),
+            [invite_group(call.organization_id, invitee)],
         )
     logger.info("Invited %d users to call %s", len(created), call.id)
     return call
@@ -69,16 +77,24 @@ def _dismiss(user, organization, invites) -> list[tuple[int, models.User]]:
     return gone
 
 
-async def _announce_dismissed(organization, gone: list[tuple[int, models.User]]) -> None:
+async def _announce_dismissed(
+    organization, gone: list[tuple[int, models.User]]
+) -> None:
     for invite_id, invitee in gone:
-        await call_invite_channel.abroadcast(CallInviteSignal(delete=invite_id), [invite_group(organization, invitee)])
+        await call_invite_channel.abroadcast(
+            CallInviteSignal(delete=invite_id), [invite_group(organization, invitee)]
+        )
 
 
 async def dismiss_call_invite(info: Info, input: inputs.DismissCallInviteInput) -> str:
     """Put an invitation away, on every device of the invitee."""
     request = info.context.request
-    invites = models.CallInvite.objects.filter(id=input.id, invitee=request.user, call__organization=request.organization)
-    gone = await _dismiss(request.user, request.organization, invites.select_related("invitee"))
+    invites = models.CallInvite.objects.filter(
+        id=input.id, invitee=request.user, call__organization=request.organization
+    )
+    gone = await _dismiss(
+        request.user, request.organization, invites.select_related("invitee")
+    )
     await _announce_dismissed(request.organization, gone)
     return str(input.id)
 
@@ -86,6 +102,8 @@ async def dismiss_call_invite(info: Info, input: inputs.DismissCallInviteInput) 
 async def clear_invites_on_join(info: Info, call: models.Call) -> None:
     """Joining answers every pending invitation to this call for the joiner."""
     request = info.context.request
-    invites = models.CallInvite.objects.filter(call=call, invitee=request.user).select_related("invitee")
+    invites = models.CallInvite.objects.filter(
+        call=call, invitee=request.user
+    ).select_related("invitee")
     gone = await _dismiss(request.user, request.organization, invites)
     await _announce_dismissed(request.organization, gone)

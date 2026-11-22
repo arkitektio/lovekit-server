@@ -11,7 +11,11 @@ import logging
 from dataclasses import dataclass
 
 from livekit.api import TwirpError
-from livekit.protocol.room import CreateRoomRequest, ListParticipantsRequest, ListRoomsRequest
+from livekit.protocol.room import (
+    CreateRoomRequest,
+    ListParticipantsRequest,
+    ListRoomsRequest,
+)
 
 from bridge import api
 
@@ -37,7 +41,9 @@ async def create_room(name: str) -> None:
     """Make sure the LiveKit room ``name`` exists (idempotent)."""
     client = api.get_api()
     try:
-        await client.room.create_room(CreateRoomRequest(name=name, empty_timeout=EMPTY_TIMEOUT))
+        await client.room.create_room(
+            CreateRoomRequest(name=name, empty_timeout=EMPTY_TIMEOUT)
+        )
     finally:
         await client.aclose()
 
@@ -54,14 +60,20 @@ async def live_room_names() -> set[str]:
 
 def call_ids(room_names: set[str]) -> list[int]:
     """The calls these LiveKit rooms belong to (a call's room is ``call-<id>``)."""
-    return [int(name[5:]) for name in room_names if name.startswith("call-") and name[5:].isdigit()]
+    return [
+        int(name[5:])
+        for name in room_names
+        if name.startswith("call-") and name[5:].isdigit()
+    ]
 
 
 async def participants(room_name: str) -> list[Participant]:
     """Who is in ``room_name`` now; nobody when the room does not exist."""
     client = api.get_api()
     try:
-        response = await client.room.list_participants(ListParticipantsRequest(room=room_name))
+        response = await client.room.list_participants(
+            ListParticipantsRequest(room=room_name)
+        )
     except TwirpError as error:
         # LiveKit answers "not_found" for a room that timed out; that is an
         # empty call, not a failure.

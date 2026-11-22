@@ -45,7 +45,9 @@ def participant_token(
         )
         .with_identity(identity)
         .with_name(display_name(user))
-        .with_metadata(json.dumps({"user": user.id, "sub": user.sub, **(metadata or {})}))
+        .with_metadata(
+            json.dumps({"user": user.id, "sub": user.sub, **(metadata or {})})
+        )
         .with_grants(
             lapi.VideoGrants(
                 room_join=True,

@@ -13,7 +13,11 @@ from bridge.graphql.mutations.call import call_group
 from bridge.graphql.subscriptions import call as subscription
 from bridge.models import Call
 
-pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.asyncio, pytest.mark.docker]
+pytestmark = [
+    pytest.mark.django_db(transaction=True),
+    pytest.mark.asyncio,
+    pytest.mark.docker,
+]
 
 ENSURE_CALL = """
 mutation ($input: EnsureCallInput!) { ensureCall(input: $input) { id } }
@@ -34,7 +38,7 @@ async def _next(layer, channel) -> CallSignal | None:
     """The next announcement on ``channel``, or None when nothing was sent."""
     try:
         message = await asyncio.wait_for(layer.receive(channel), timeout=0.5)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return None
     assert message["type"] == call_channel.message_type
     return CallSignal.model_validate(message["message"])
@@ -53,7 +57,9 @@ async def _events(context, signals: list[CallSignal]) -> list[tuple[str, str]]:
     call_channel.listen = listen
     try:
         return [
-            ("create", str(event.create.id)) if event.create else ("update", str(event.update.id))
+            ("create", str(event.create.id))
+            if event.create
+            else ("update", str(event.update.id))
             async for event in subscription.calls(None, info)
         ]
     finally:
@@ -62,10 +68,14 @@ async def _events(context, signals: list[CallSignal]) -> list[tuple[str, str]]:
 
 async def _heard(context, signals: list[CallSignal]) -> list[str]:
     """The calls the subscription announces to ``context`` as started."""
-    return [call_id for kind, call_id in await _events(context, signals) if kind == "create"]
+    return [
+        call_id for kind, call_id in await _events(context, signals) if kind == "create"
+    ]
 
 
-async def test_a_new_call_is_announced_to_its_organization(aexecute, authenticated_context):
+async def test_a_new_call_is_announced_to_its_organization(
+    aexecute, authenticated_context
+):
     layer, channel = await _listen(authenticated_context.request.organization)
 
     res = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
@@ -101,7 +111,9 @@ async def test_another_organization_hears_nothing(aexecute):
     assert await _next(layer, channel) is None
 
 
-async def test_the_subscription_tells_the_others_and_not_the_starter(aexecute, authenticated_context, other_user_context):
+async def test_the_subscription_tells_the_others_and_not_the_starter(
+    aexecute, authenticated_context, other_user_context
+):
     res = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
     call_id = res.data["ensureCall"]["id"]
     signals = [CallSignal(create=int(call_id))]
@@ -111,7 +123,9 @@ async def test_the_subscription_tells_the_others_and_not_the_starter(aexecute, a
     assert await _heard(authenticated_context, signals) == []
 
 
-async def test_the_subscription_drops_a_call_of_another_organization(aexecute, other_user_context):
+async def test_the_subscription_drops_a_call_of_another_organization(
+    aexecute, other_user_context
+):
     """Scoped on the way out as well: a stray signal is not a way across tenants."""
     from tests.conftest import _make_context
 
@@ -122,22 +136,33 @@ async def test_the_subscription_drops_a_call_of_another_organization(aexecute, o
     stranger = await sync_to_async(_make_context)(
         token="stranger", sub="9", username="static_issuer_9", org_slug="another_org"
     )
-    assert await _heard(stranger, [CallSignal(create=call_id), CallSignal(create=999_999)]) == []
+    assert (
+        await _heard(stranger, [CallSignal(create=call_id), CallSignal(create=999_999)])
+        == []
+    )
 
 
-async def test_an_open_app_hears_the_call_over_its_websocket(aexecute, other_user_context):
+async def test_an_open_app_hears_the_call_over_its_websocket(
+    aexecute, other_user_context
+):
     """The whole way: a subscriber's socket, the group it joins, the call as it yields."""
     from kante.testing import GraphQLWebSocketTestClient
 
     from lovekit_server.asgi import application
 
-    async with GraphQLWebSocketTestClient(application, connection_params={"token": "othertest"}) as client:
-        heard = client.subscribe("subscription { calls { create { id title } } }", timeout=3, max_messages=1)
+    async with GraphQLWebSocketTestClient(
+        application, connection_params={"token": "othertest"}
+    ) as client:
+        heard = client.subscribe(
+            "subscription { calls { create { id title } } }", timeout=3, max_messages=1
+        )
         listening = asyncio.ensure_future(anext(heard))
         # Let the subscription join its group before the call starts.
         await asyncio.sleep(0.3)
 
-        res = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE], "title": "Look at this"}})
+        res = await aexecute(
+            ENSURE_CALL, {"input": {"about": [IMAGE], "title": "Look at this"}}
+        )
         assert not res.errors, res.errors
 
         message = await listening
@@ -154,12 +179,16 @@ mutation ($input: AddToCallInput!) { addToCall(input: $input) { id } }
 OTHER_IMAGE = {"identifier": "@mikro/image", "object": 43}
 
 
-async def test_a_new_topic_is_told_to_the_organization_once(aexecute, authenticated_context):
+async def test_a_new_topic_is_told_to_the_organization_once(
+    aexecute, authenticated_context
+):
     res = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
     call_id = res.data["ensureCall"]["id"]
     layer, channel = await _listen(authenticated_context.request.organization)
 
-    added = await aexecute(ADD_TO_CALL, {"input": {"call": call_id, "about": [OTHER_IMAGE]}})
+    added = await aexecute(
+        ADD_TO_CALL, {"input": {"call": call_id, "about": [OTHER_IMAGE]}}
+    )
     assert not added.errors, added.errors
     signal = await _next(layer, channel)
     assert signal is not None
@@ -170,7 +199,9 @@ async def test_a_new_topic_is_told_to_the_organization_once(aexecute, authentica
     assert await _next(layer, channel) is None
 
 
-async def test_a_new_topic_reaches_everyone_the_starter_included(aexecute, authenticated_context, other_user_context):
+async def test_a_new_topic_reaches_everyone_the_starter_included(
+    aexecute, authenticated_context, other_user_context
+):
     res = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
     call_id = res.data["ensureCall"]["id"]
     signals = [CallSignal(update=int(call_id))]

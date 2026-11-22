@@ -36,7 +36,9 @@ def _structures(about: list[inputs.StructureInput]) -> list[models.Structure]:
     """The structure rows for these references, created when new."""
     rows = []
     for reference in about:
-        row, _ = models.Structure.objects.get_or_create(identifier=reference.identifier, object=reference.object)
+        row, _ = models.Structure.objects.get_or_create(
+            identifier=reference.identifier, object=reference.object
+        )
         rows.append(row)
     return rows
 
@@ -60,14 +62,18 @@ def _title(input: inputs.EnsureCallInput) -> str:
 
 
 @sync_to_async
-def _find_or_create(info: Info, input: inputs.EnsureCallInput, live: set[str]) -> tuple[models.Call, bool]:
+def _find_or_create(
+    info: Info, input: inputs.EnsureCallInput, live: set[str]
+) -> tuple[models.Call, bool]:
     organization = info.context.request.organization
     structures = _structures(input.about)
 
     # The newest live call about exactly these structures, if any; failing
     # that, one that is about them among other things. A call that took on a
     # second topic (``addToCall``) is still the call about its first.
-    candidates = models.Call.objects.filter(organization=organization, id__in=calls.call_ids(live))
+    candidates = models.Call.objects.filter(
+        organization=organization, id__in=calls.call_ids(live)
+    )
     for structure in structures:
         candidates = candidates.filter(about=structure)
     about_these = list(candidates.order_by("-created_at"))
@@ -95,18 +101,33 @@ async def ensure_call(info: Info, input: inputs.EnsureCallInput) -> types.Call:
     if created:
         # After the room is up, so whoever hears of the call finds it live. A
         # reused call was announced when it started and is not announced again.
-        await call_channel.abroadcast(CallSignal(create=call.id), [call_group(call.organization_id)])
-    logger.info("%s call %s (%s)", "Started" if created else "Rejoined", call.id, call.livekit_room_name)
+        await call_channel.abroadcast(
+            CallSignal(create=call.id), [call_group(call.organization_id)]
+        )
+    logger.info(
+        "%s call %s (%s)",
+        "Started" if created else "Rejoined",
+        call.id,
+        call.livekit_room_name,
+    )
     return call
 
 
 @sync_to_async
 def _add_about(info: Info, input: inputs.AddToCallInput) -> tuple[models.Call, bool]:
     """Turn the call to these structures; says whether anything changed."""
-    call = models.Call.objects.get(id=input.call, organization=info.context.request.organization)
+    call = models.Call.objects.get(
+        id=input.call, organization=info.context.request.organization
+    )
     # Each once, in the order given.
-    wanted = list({structure.id: structure for structure in _structures(input.about)}.values())
-    order = list(models.Call.about.through.objects.filter(call_id=call.id).order_by("id").values_list("structure_id", flat=True))
+    wanted = list(
+        {structure.id: structure for structure in _structures(input.about)}.values()
+    )
+    order = list(
+        models.Call.about.through.objects.filter(call_id=call.id)
+        .order_by("id")
+        .values_list("structure_id", flat=True)
+    )
     if order[-len(wanted) :] == [structure.id for structure in wanted]:
         return call, False
     # Nothing the call was about is lost: the new ones go last, and one it
@@ -122,7 +143,9 @@ async def add_to_call(info: Info, input: inputs.AddToCallInput) -> types.Call:
         raise ValueError("Name something to add to the call")
     call, changed = await _add_about(info, input)
     if changed:
-        await call_channel.abroadcast(CallSignal(update=call.id), [call_group(call.organization_id)])
+        await call_channel.abroadcast(
+            CallSignal(update=call.id), [call_group(call.organization_id)]
+        )
         logger.info("Call %s turned to %d structures", call.id, len(input.about))
     return call
 
@@ -138,7 +161,9 @@ async def join_call(info: Info, input: inputs.JoinCallInput) -> types.Connection
     is the issuer-and-sub artifact, not what anyone calls the user.
     """
     user = info.context.request.user
-    call = await models.Call.objects.aget(id=input.call, organization=info.context.request.organization)
+    call = await models.Call.objects.aget(
+        id=input.call, organization=info.context.request.organization
+    )
     await calls.create_room(call.livekit_room_name)
     # Answered: the invitation stops ringing on the user's other devices too.
     await clear_invites_on_join(info, call)

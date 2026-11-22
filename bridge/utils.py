@@ -1,5 +1,6 @@
 from kante.types import Info
-from bridge import models, types
+
+from bridge import models
 
 
 async def aget_backend_for_info(info: Info, instance_id: str) -> models.Backend:

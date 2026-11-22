@@ -1,7 +1,7 @@
 """Invitations arriving for the subscriber, on whichever device this is."""
 
 import logging
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import strawberry
 from kante.types import Info
@@ -15,8 +15,13 @@ logger = logging.getLogger(__name__)
 
 @strawberry.type(description="An invitation to a call arriving, or going away")
 class CallInviteEvent:
-    create: types.CallInvite | None = strawberry.field(default=None, description="A new invitation for you")
-    delete: strawberry.ID | None = strawberry.field(default=None, description="An invitation that was dismissed or answered, here or on another device")
+    create: types.CallInvite | None = strawberry.field(
+        default=None, description="A new invitation for you"
+    )
+    delete: strawberry.ID | None = strawberry.field(
+        default=None,
+        description="An invitation that was dismissed or answered, here or on another device",
+    )
 
 
 async def call_invites(self, info: Info) -> AsyncGenerator[CallInviteEvent, None]:
@@ -26,9 +31,9 @@ async def call_invites(self, info: Info) -> AsyncGenerator[CallInviteEvent, None
     async for signal in call_invite_channel.listen(info, [group]):
         if signal.create is not None:
             try:
-                invite = await models.CallInvite.objects.select_related("call", "inviter", "invitee").aget(
-                    id=signal.create, invitee=request.user
-                )
+                invite = await models.CallInvite.objects.select_related(
+                    "call", "inviter", "invitee"
+                ).aget(id=signal.create, invitee=request.user)
             except models.CallInvite.DoesNotExist:
                 continue
             yield CallInviteEvent(create=invite)

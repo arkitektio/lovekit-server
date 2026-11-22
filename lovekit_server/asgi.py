@@ -18,19 +18,19 @@ from arkitekt_service import telemetry  # noqa: E402
 telemetry.setup()
 
 from django.core.asgi import get_asgi_application  # noqa: E402
+
 # Initialize Django ASGI application early to ensure the AppRegistry
 # is populated before importing code that may import ORM models.
 django_asgi_app = get_asgi_application()
 
 
-from .schema import schema  # noqa: E402
-from kante.router import router # noqa: E402
+from kante.router import router  # noqa: E402
 
+from .schema import schema  # noqa: E402
 
 application = telemetry.wrap(
     router(
         schema=schema,
         django_asgi_app=django_asgi_app,
-        
     )
 )

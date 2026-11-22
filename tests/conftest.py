@@ -6,19 +6,19 @@ import time
 import psycopg
 import pytest
 import pytest_asyncio
-from asgiref.sync import sync_to_async
-
-from authentikate.models import Client, Organization, User, Membership
+from authentikate.models import Client, Membership, Organization, User
 from django.contrib.contenttypes.management import create_contenttypes
 from django.db.models.signals import post_migrate
+from dokker import testing
 from kante.context import HttpContext, UniversalRequest, WsContext
 from strawberry.http.temporal_response import TemporalResponse
-from dokker import testing
 
 
 @pytest.fixture(scope="session")
 def backend_stack():
-    docker_compose_path = os.path.join(os.path.dirname(__file__), "integration", "docker-compose.yaml")
+    docker_compose_path = os.path.join(
+        os.path.dirname(__file__), "integration", "docker-compose.yaml"
+    )
 
     with testing(docker_compose_path) as e:
         e.inspect()
@@ -79,7 +79,9 @@ def django_db_setup(django_db_setup, django_db_blocker):
         contenttypes = list(ContentType.objects.all())
         permissions = list(Permission.objects.all())
 
-    post_migrate.disconnect(dispatch_uid="django.contrib.auth.management.create_permissions")
+    post_migrate.disconnect(
+        dispatch_uid="django.contrib.auth.management.create_permissions"
+    )
     post_migrate.disconnect(create_contenttypes)
 
     def restore_contenttypes_and_permissions(sender, **kwargs):
@@ -140,7 +142,9 @@ def authenticated_context(db, backend_stack) -> HttpContext:
     # Match the identity the static "test" token resolves to (see settings_test
     # AUTHENTIKATE static_tokens), so the user/client on this context is the same
     # one the schema's AuthentikateExtension authenticates as at resolve time.
-    return _make_context(token="test", sub="1", username="static_issuer_1", org_slug="static_org")
+    return _make_context(
+        token="test", sub="1", username="static_issuer_1", org_slug="static_org"
+    )
 
 
 @pytest.fixture(scope="function")
@@ -150,19 +154,25 @@ def other_user_context(db, backend_stack) -> HttpContext:
     Uses the "othertest" static token (sub 9) so the AuthentikateExtension
     actually authenticates it as a separate user.
     """
-    return _make_context(token="othertest", sub="9", username="static_issuer_9", org_slug="static_org")
+    return _make_context(
+        token="othertest", sub="9", username="static_issuer_9", org_slug="static_org"
+    )
 
 
 @pytest.fixture(scope="function")
 def stranger_context(db, backend_stack) -> HttpContext:
     """The second user in ANOTHER organization ("stranger"), for tenant scoping tests."""
-    return _make_context(token="stranger", sub="9", username="static_issuer_9", org_slug="another_org")
+    return _make_context(
+        token="stranger", sub="9", username="static_issuer_9", org_slug="another_org"
+    )
 
 
 @pytest.fixture(scope="function")
 def second_app_context(db, backend_stack) -> HttpContext:
     """The first user running a second app ("secondapp"): another client, so another agent."""
-    return _make_context(token="secondapp", sub="1", username="static_issuer_1", org_slug="static_org")
+    return _make_context(
+        token="secondapp", sub="1", username="static_issuer_1", org_slug="static_org"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +222,9 @@ class Subscriber:
     way a client disconnect would.
     """
 
-    def __init__(self, context: WsContext, query: str, variables: dict[str, object]) -> None:
+    def __init__(
+        self, context: WsContext, query: str, variables: dict[str, object]
+    ) -> None:
         self.context = context
         self.query = query
         self.variables = variables
@@ -222,7 +234,9 @@ class Subscriber:
     async def _run(self) -> None:
         from lovekit_server.schema import schema
 
-        subscription = await schema.subscribe(self.query, variable_values=self.variables, context_value=self.context)
+        subscription = await schema.subscribe(
+            self.query, variable_values=self.variables, context_value=self.context
+        )
         if hasattr(subscription, "errors"):
             self.events.put_nowait(subscription)
             return
@@ -238,7 +252,7 @@ class Subscriber:
         """True when nothing more arrives within ``timeout``."""
         try:
             await asyncio.wait_for(self.events.get(), timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return True
         return False
 
@@ -264,7 +278,9 @@ async def subscribe(db, backend_stack):
     pumps: list[asyncio.Task] = []
     subscribers: list[Subscriber] = []
 
-    async def _start(query: str, variables: dict[str, object], group: str, token: str = "test") -> Subscriber:
+    async def _start(
+        query: str, variables: dict[str, object], group: str, token: str = "test"
+    ) -> Subscriber:
         consumer = ChannelsConsumer()
         consumer.channel_layer = layer
         consumer.channel_name = await layer.new_channel()
@@ -285,7 +301,9 @@ async def subscribe(db, backend_stack):
         for _ in range(500):
             if subscriber.task.done():
                 subscriber.task.result()
-                pytest.fail(f"subscription ended before listening: {subscriber.events.get_nowait()}")
+                pytest.fail(
+                    f"subscription ended before listening: {subscriber.events.get_nowait()}"
+                )
             if consumer.channel_name in layer.groups.get(group, {}):
                 return subscriber
             await asyncio.sleep(0.01)

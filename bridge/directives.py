@@ -1,4 +1,3 @@
-from typing import Optional
 import strawberry
 from strawberry.schema_directive import Location
 
