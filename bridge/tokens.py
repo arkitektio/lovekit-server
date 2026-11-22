@@ -16,11 +16,12 @@ others see, and the metadata says who is behind it.
 import json
 import secrets
 
+from authentikate.models import User
 from django.conf import settings
 from livekit import api as lapi
 
 
-def display_name(user) -> str:
+def display_name(user: User) -> str:
     """The preferred username (authentikate keeps it on ``first_name``), not the iss_sub artifact."""
     return user.first_name or user.username
 
@@ -30,7 +31,7 @@ def participant_token(
     *,
     kind: str,
     id: int,
-    user,
+    user: User,
     can_publish: bool,
     can_publish_data: bool = False,
     metadata: dict | None = None,

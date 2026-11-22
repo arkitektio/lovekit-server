@@ -36,7 +36,7 @@ class StreamEvent:
     )
 
 
-async def streams(self, info: Info) -> AsyncGenerator[StreamEvent, None]:
+async def streams(self: object, info: Info) -> AsyncGenerator[StreamEvent, None]:
     """The streams of your organization's agents, as they are declared, changed and dropped.
 
     And whether they are live, as LiveKit's webhook says it changes: read ``Stream.live``

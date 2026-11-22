@@ -5,12 +5,19 @@ mints, publish real tracks, and read ``live`` back through the schema.
 """
 
 import asyncio
+from collections.abc import Awaitable, Callable
+from typing import TypeVar
 
 import pytest
 from django.conf import settings
+from kante.context import HttpContext
 from livekit import rtc
-from livekit.api import TokenVerifier
+from livekit.api import LiveKitAPI, TokenVerifier
 from livekit.protocol.room import ListParticipantsRequest
+
+from tests.support import AExecute, data_of
+
+_T = TypeVar("_T")
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -41,17 +48,21 @@ query ($id: ID!) { agent(id: $id) { live streams { key live } } }
 """
 
 
-async def _declare(aexecute, keys, context=None):
+async def _declare(
+    aexecute: AExecute, keys: list[str], context: HttpContext | None = None
+) -> list[dict]:
     res = await aexecute(
         DECLARE, {"input": {"streams": [{"key": key} for key in keys]}}, context=context
     )
     assert not res.errors, res.errors
+    assert res.data is not None
     return res.data["declareStreams"]
 
 
-async def _token(aexecute, context=None) -> str:
+async def _token(aexecute: AExecute, context: HttpContext | None = None) -> str:
     res = await aexecute(PUBLISH_TOKEN, context=context)
     assert not res.errors, res.errors
+    assert res.data is not None
     assert res.data["publisherConnection"]["transport"] == "LIVEKIT"
     return res.data["publisherConnection"]["credential"]
 
@@ -79,7 +90,9 @@ async def _publish(token: str, *names: str) -> tuple[rtc.Room, list[str]]:
     return room, reasons
 
 
-async def _eventually(read, expected, timeout: float = 10.0):
+async def _eventually(
+    read: Callable[[], Awaitable[_T]], expected: _T, timeout: float = 10.0
+) -> _T:
     """``read()`` once it returns ``expected``: LiveKit lists a track a moment after it is published."""
     deadline = asyncio.get_running_loop().time() + timeout
     while True:
@@ -89,7 +102,7 @@ async def _eventually(read, expected, timeout: float = 10.0):
         await asyncio.sleep(0.2)
 
 
-async def test_the_publish_token_is_the_agents_one_identity(aexecute):
+async def test_the_publish_token_is_the_agents_one_identity(aexecute: AExecute) -> None:
     [stream] = await _declare(aexecute, ["camera"])
     token = await _token(aexecute)
 
@@ -108,17 +121,22 @@ async def test_the_publish_token_is_the_agents_one_identity(aexecute):
     )
 
 
-async def test_there_is_no_publish_token_before_a_declaration(aexecute):
+async def test_there_is_no_publish_token_before_a_declaration(
+    aexecute: AExecute,
+) -> None:
     res = await aexecute(PUBLISH_TOKEN)
     assert res.errors and "declareStreams" in res.errors[0].message
 
 
-async def test_a_stream_is_live_while_its_track_is_published(aexecute):
+async def test_a_stream_is_live_while_its_track_is_published(
+    aexecute: AExecute,
+) -> None:
     camera, overview = await _declare(aexecute, ["camera", "overview"])
 
-    async def live(stream) -> bool:
+    async def live(stream: dict) -> bool:
         res = await aexecute(LIVE, {"id": stream["id"]})
         assert not res.errors, res.errors
+        assert res.data is not None
         return res.data["stream"]["live"]
 
     assert await live(camera) is False
@@ -130,23 +148,25 @@ async def test_a_stream_is_live_while_its_track_is_published(aexecute):
         assert await live(overview) is False
 
         agent = await aexecute(AGENT, {"id": camera["agent"]["id"]})
-        assert agent.data["agent"]["live"] is True
-        assert agent.data["agent"]["streams"] == [
+        assert data_of(agent)["agent"]["live"] is True
+        assert data_of(agent)["agent"]["streams"] == [
             {"key": "camera", "live": True},
             {"key": "overview", "live": False},
         ]
 
         res = await aexecute(STREAMS, {"live": True})
-        assert res.data["streams"] == [{"key": "camera", "live": True}]
+        assert data_of(res)["streams"] == [{"key": "camera", "live": True}]
         res = await aexecute(STREAMS, {"live": False})
-        assert res.data["streams"] == [{"key": "overview", "live": False}]
+        assert data_of(res)["streams"] == [{"key": "overview", "live": False}]
     finally:
         await room.disconnect()
 
     assert await _eventually(lambda: live(camera), False) is False
 
 
-async def test_a_data_stream_is_live_while_its_data_track_is_published(aexecute):
+async def test_a_data_stream_is_live_while_its_data_track_is_published(
+    aexecute: AExecute,
+) -> None:
     spectrum = {
         "key": "spectrum",
         "kind": "DATA",
@@ -158,10 +178,11 @@ async def test_a_data_stream_is_live_while_its_data_track_is_published(aexecute)
     }
     res = await aexecute(DECLARE, {"input": {"streams": [spectrum]}})
     assert not res.errors, res.errors
+    assert res.data is not None
     [stream] = res.data["declareStreams"]
 
     async def live() -> bool:
-        return (await aexecute(LIVE, {"id": stream["id"]})).data["stream"]["live"]
+        return data_of(await aexecute(LIVE, {"id": stream["id"]}))["stream"]["live"]
 
     room = rtc.Room()
     await asyncio.wait_for(room.connect(URL, await _token(aexecute)), 20)
@@ -175,14 +196,16 @@ async def test_a_data_stream_is_live_while_its_data_track_is_published(aexecute)
         await room.disconnect()
 
 
-async def test_a_restarted_agent_replaces_its_old_connection(aexecute, livekit_client):
+async def test_a_restarted_agent_replaces_its_old_connection(
+    aexecute: AExecute, livekit_client: LiveKitAPI
+) -> None:
     [stream] = await _declare(aexecute, ["camera"])
     old, old_reasons = await _publish(await _token(aexecute), "camera")
     new, _ = await _publish(await _token(aexecute), "camera")
     try:
         room = stream["agent"]["roomName"]
 
-        async def participants():
+        async def participants() -> list[tuple[str, list[str]]]:
             response = await livekit_client.room.list_participants(
                 ListParticipantsRequest(room=room)
             )

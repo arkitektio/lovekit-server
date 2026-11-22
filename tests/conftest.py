@@ -2,20 +2,27 @@ import asyncio
 import contextlib
 import os
 import time
+from collections.abc import AsyncIterator, Iterator, Mapping
 
 import psycopg
 import pytest
 import pytest_asyncio
 from authentikate.models import Client, Membership, Organization, User
+from django.apps import AppConfig
 from django.contrib.contenttypes.management import create_contenttypes
 from django.db.models.signals import post_migrate
 from dokker import testing
-from kante.context import HttpContext, UniversalRequest, WsContext
+from kante.context import Context, HttpContext, UniversalRequest, WsContext
+from livekit.api import LiveKitAPI
+from pytest_django import DjangoDbBlocker
 from strawberry.http.temporal_response import TemporalResponse
+from strawberry.types import ExecutionResult
+
+from tests.support import AExecute, Subscribe, Subscriber
 
 
 @pytest.fixture(scope="session")
-def backend_stack():
+def backend_stack() -> Iterator[None]:
     docker_compose_path = os.path.join(
         os.path.dirname(__file__), "integration", "docker-compose.yaml"
     )
@@ -60,13 +67,15 @@ def backend_stack():
 
 
 @pytest.fixture(scope="session")
-def django_db_modify_db_settings(backend_stack):
+def django_db_modify_db_settings(backend_stack: None) -> Iterator[None]:
     """Start the backend services before pytest-django configures the test DB."""
     yield
 
 
 @pytest.fixture(scope="session")
-def django_db_setup(django_db_setup, django_db_blocker):
+def django_db_setup(
+    django_db_setup: None, django_db_blocker: DjangoDbBlocker
+) -> Iterator[None]:
     # Every transaction=True test teardown flushes the DB and re-fires
     # post_migrate, which rebuilds all contenttypes and permissions from the
     # model registry (~1s per test). The rows never change between tests, so
@@ -84,9 +93,11 @@ def django_db_setup(django_db_setup, django_db_blocker):
     )
     post_migrate.disconnect(create_contenttypes)
 
-    def restore_contenttypes_and_permissions(sender, **kwargs):
+    def restore_contenttypes_and_permissions(
+        sender: AppConfig, **kwargs: object
+    ) -> None:
         # post_migrate fires once per app config on flush; restore once.
-        if getattr(sender, "label", None) != "contenttypes":
+        if sender.label != "contenttypes":
             return
         ContentType.objects.bulk_create(contenttypes, ignore_conflicts=True)
         Permission.objects.bulk_create(permissions, ignore_conflicts=True)
@@ -138,7 +149,7 @@ def _make_context(token: str, sub: str, username: str, org_slug: str) -> HttpCon
 
 
 @pytest.fixture(scope="function")
-def authenticated_context(db, backend_stack) -> HttpContext:
+def authenticated_context(db: None, backend_stack: None) -> HttpContext:
     # Match the identity the static "test" token resolves to (see settings_test
     # AUTHENTIKATE static_tokens), so the user/client on this context is the same
     # one the schema's AuthentikateExtension authenticates as at resolve time.
@@ -148,7 +159,7 @@ def authenticated_context(db, backend_stack) -> HttpContext:
 
 
 @pytest.fixture(scope="function")
-def other_user_context(db, backend_stack) -> HttpContext:
+def other_user_context(db: None, backend_stack: None) -> HttpContext:
     """A second, distinct user — for ownership/cross-user denial tests.
 
     Uses the "othertest" static token (sub 9) so the AuthentikateExtension
@@ -160,7 +171,7 @@ def other_user_context(db, backend_stack) -> HttpContext:
 
 
 @pytest.fixture(scope="function")
-def stranger_context(db, backend_stack) -> HttpContext:
+def stranger_context(db: None, backend_stack: None) -> HttpContext:
     """The second user in ANOTHER organization ("stranger"), for tenant scoping tests."""
     return _make_context(
         token="stranger", sub="9", username="static_issuer_9", org_slug="another_org"
@@ -168,7 +179,7 @@ def stranger_context(db, backend_stack) -> HttpContext:
 
 
 @pytest.fixture(scope="function")
-def second_app_context(db, backend_stack) -> HttpContext:
+def second_app_context(db: None, backend_stack: None) -> HttpContext:
     """The first user running a second app ("secondapp"): another client, so another agent."""
     return _make_context(
         token="secondapp", sub="1", username="static_issuer_1", org_slug="static_org"
@@ -181,14 +192,18 @@ def second_app_context(db, backend_stack) -> HttpContext:
 
 
 @pytest.fixture
-def aexecute(authenticated_context):
+def aexecute(authenticated_context: HttpContext) -> AExecute:
     """Run a GraphQL document against the schema, defaulting to the authed context."""
     from lovekit_server.schema import schema
 
-    async def _run(query, variables=None, context=None):
+    async def _run(
+        query: str,
+        variables: Mapping[str, object] | None = None,
+        context: Context | None = None,
+    ) -> ExecutionResult:
         return await schema.execute(
             query,
-            variable_values=variables or {},
+            variable_values=dict(variables or {}),
             context_value=context or authenticated_context,
         )
 
@@ -196,7 +211,7 @@ def aexecute(authenticated_context):
 
 
 @pytest_asyncio.fixture
-async def livekit_client(backend_stack):
+async def livekit_client(backend_stack: None) -> AsyncIterator[LiveKitAPI]:
     """The LiveKit API client (same one the mutations use), for asserting room state.
 
     Async fixture so the aiohttp-backed client is created and closed on the same
@@ -214,56 +229,8 @@ async def livekit_client(backend_stack):
 # ---------------------------------------------------------------------------
 
 
-class Subscriber:
-    """Drives one subscription from a single task, collecting what it yields.
-
-    The AuthentikateExtension sets and resets context variables around the operation,
-    which must happen in the same task; cancelling the task closes the subscription the
-    way a client disconnect would.
-    """
-
-    def __init__(
-        self, context: WsContext, query: str, variables: dict[str, object]
-    ) -> None:
-        self.context = context
-        self.query = query
-        self.variables = variables
-        self.events: asyncio.Queue = asyncio.Queue()
-        self.task = asyncio.create_task(self._run())
-
-    async def _run(self) -> None:
-        from lovekit_server.schema import schema
-
-        subscription = await schema.subscribe(
-            self.query, variable_values=self.variables, context_value=self.context
-        )
-        if hasattr(subscription, "errors"):
-            self.events.put_nowait(subscription)
-            return
-        async for result in subscription:
-            self.events.put_nowait(result)
-
-    async def next(self, timeout: float = 5) -> dict:
-        result = await asyncio.wait_for(self.events.get(), timeout)
-        assert not result.errors, result.errors
-        return result.data
-
-    async def nothing(self, timeout: float = 0.5) -> bool:
-        """True when nothing more arrives within ``timeout``."""
-        try:
-            await asyncio.wait_for(self.events.get(), timeout)
-        except TimeoutError:
-            return True
-        return False
-
-    async def close(self) -> None:
-        self.task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await self.task
-
-
 @pytest_asyncio.fixture
-async def subscribe(db, backend_stack):
+async def subscribe(db: None, backend_stack: None) -> AsyncIterator[Subscribe]:
     """Start a subscription as a static token, once it listens on ``group``; closed after the test.
 
     One ``ChannelsConsumer`` per subscriber, bound to the in-memory layer, with a pump that

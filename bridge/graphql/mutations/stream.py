@@ -20,6 +20,7 @@ import strawberry
 from arkitekt_service.collaborations.guests import arequire_in_collaboration
 from asgiref.sync import sync_to_async
 from django.db import transaction
+from kante.context import Organization
 from kante.types import Info
 
 from bridge import calls, enums, inputs, models, tokens, types
@@ -30,13 +31,13 @@ from lovekit_server.service import service  # noqa: F401 - it binds the models t
 logger = logging.getLogger(__name__)
 
 
-def stream_group(organization) -> str:
+def stream_group(organization: Organization | int) -> str:
     """The channel group an organization's apps listen on for streams. One definition, both sides.
 
     Spelled by hand for the reason ``call_group`` is: a channel-layer group name may not
     hold the colons ``org_group`` joins with.
     """
-    organization_id = getattr(organization, "id", organization)
+    organization_id = organization if isinstance(organization, int) else organization.id
     return f"streams.org{organization_id}"
 
 

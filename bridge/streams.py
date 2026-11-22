@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from kante.context import Context
 from livekit.api import TwirpError
 from livekit.protocol.room import ListParticipantsRequest
 from strawberry.dataloader import DataLoader
@@ -58,7 +59,7 @@ async def live_tracks() -> dict[int, set[str]]:
     tracks = await asyncio.gather(
         *(published_tracks(f"agent-{id}", f"agent-{id}") for id in ids)
     )
-    return dict(zip(ids, tracks))
+    return dict(zip(ids, tracks, strict=True))
 
 
 async def _load(keys: list[tuple[str, str]]) -> list[set[str]]:
@@ -73,12 +74,13 @@ async def _load(keys: list[tuple[str, str]]) -> list[set[str]]:
                     for room_name, publisher in unique
                 )
             ),
+            strict=True,
         )
     )
     return [answers[key] for key in keys]
 
 
-def tracks_loader(context) -> DataLoader[tuple[str, str], set[str]]:
+def tracks_loader(context: Context) -> DataLoader[tuple[str, str], set[str]]:
     """The context's loader of published tracks, keyed by ``(room, publisher)``.
 
     Kept on the context, so the streams of one answer ask LiveKit once per agent, not once

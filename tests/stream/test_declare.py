@@ -10,8 +10,10 @@ import pytest
 from asgiref.sync import sync_to_async
 from django.db import close_old_connections
 from django.db.models.signals import post_delete, post_save
+from kante.context import HttpContext
 
 from bridge.models import Agent, Stream
+from tests.support import AExecute
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -32,9 +34,14 @@ CAMERAS = [
 ]
 
 
-async def _declare(aexecute, streams, context=None):
+async def _declare(
+    aexecute: AExecute,
+    streams: list[dict[str, str]],
+    context: HttpContext | None = None,
+) -> list[dict]:
     res = await aexecute(DECLARE, {"input": {"streams": streams}}, context=context)
     assert not res.errors, res.errors
+    assert res.data is not None
     return res.data["declareStreams"]
 
 
@@ -44,23 +51,27 @@ class _Writes:
     def __init__(self) -> None:
         self.seen: list[tuple[str, int]] = []
 
-    def _saved(self, sender, instance, created, **kwargs) -> None:
-        self.seen.append(("created" if created else "updated", instance.id))
+    def _saved(
+        self, sender: type[Stream], instance: Stream, created: bool, **kwargs: object
+    ) -> None:
+        self.seen.append(("created" if created else "updated", instance.pk))
 
-    def _deleted(self, sender, instance, **kwargs) -> None:
-        self.seen.append(("deleted", instance.id))
+    def _deleted(
+        self, sender: type[Stream], instance: Stream, **kwargs: object
+    ) -> None:
+        self.seen.append(("deleted", instance.pk))
 
     def __enter__(self) -> "_Writes":
         post_save.connect(self._saved, sender=Stream, weak=False)
         post_delete.connect(self._deleted, sender=Stream, weak=False)
         return self
 
-    def __exit__(self, *exc) -> None:
+    def __exit__(self, *exc: object) -> None:
         post_save.disconnect(self._saved, sender=Stream)
         post_delete.disconnect(self._deleted, sender=Stream)
 
 
-async def test_an_agent_declares_its_streams(aexecute):
+async def test_an_agent_declares_its_streams(aexecute: AExecute) -> None:
     streams = await _declare(aexecute, CAMERAS)
 
     assert [(s["key"], s["title"], s["kind"]) for s in streams] == [
@@ -75,25 +86,27 @@ async def test_an_agent_declares_its_streams(aexecute):
     assert await Agent.objects.acount() == 1
 
 
-async def test_a_title_defaults_to_the_key(aexecute):
+async def test_a_title_defaults_to_the_key(aexecute: AExecute) -> None:
     [stream] = await _declare(aexecute, [{"key": "microscope", "kind": "AUDIO"}])
     assert (stream["title"], stream["kind"]) == ("microscope", "AUDIO")
 
 
-async def test_a_restart_finds_the_same_streams(aexecute):
+async def test_a_restart_finds_the_same_streams(aexecute: AExecute) -> None:
     first = await _declare(aexecute, CAMERAS)
     again = await _declare(aexecute, CAMERAS)
     assert [s["id"] for s in again] == [s["id"] for s in first]
 
 
-async def test_a_restart_with_the_same_streams_writes_nothing(aexecute):
+async def test_a_restart_with_the_same_streams_writes_nothing(
+    aexecute: AExecute,
+) -> None:
     await _declare(aexecute, CAMERAS)
     with _Writes() as writes:
         await _declare(aexecute, CAMERAS)
     assert writes.seen == []
 
 
-async def test_what_changed_is_saved_and_nothing_else(aexecute):
+async def test_what_changed_is_saved_and_nothing_else(aexecute: AExecute) -> None:
     first = await _declare(aexecute, CAMERAS)
     changed = [
         {"key": "camera", "title": "Main camera"},
@@ -105,7 +118,7 @@ async def test_what_changed_is_saved_and_nothing_else(aexecute):
     assert again[1]["id"] == first[1]["id"] and again[1]["title"] == "The stage"
 
 
-async def test_a_stream_left_out_is_removed(aexecute):
+async def test_a_stream_left_out_is_removed(aexecute: AExecute) -> None:
     first = await _declare(aexecute, CAMERAS)
     with _Writes() as writes:
         again = await _declare(
@@ -116,7 +129,7 @@ async def test_a_stream_left_out_is_removed(aexecute):
     assert not await Stream.objects.filter(id=first[1]["id"]).aexists()
 
 
-async def test_declaring_nothing_removes_every_stream(aexecute):
+async def test_declaring_nothing_removes_every_stream(aexecute: AExecute) -> None:
     await _declare(aexecute, CAMERAS)
     assert await _declare(aexecute, []) == []
     assert await Stream.objects.acount() == 0
@@ -124,7 +137,7 @@ async def test_declaring_nothing_removes_every_stream(aexecute):
     assert await Agent.objects.acount() == 1
 
 
-async def test_a_key_is_declared_once(aexecute):
+async def test_a_key_is_declared_once(aexecute: AExecute) -> None:
     res = await aexecute(
         DECLARE, {"input": {"streams": [{"key": "camera"}, {"key": "camera"}]}}
     )
@@ -132,12 +145,14 @@ async def test_a_key_is_declared_once(aexecute):
     assert await Stream.objects.acount() == 0
 
 
-async def test_a_stream_needs_a_key(aexecute):
+async def test_a_stream_needs_a_key(aexecute: AExecute) -> None:
     res = await aexecute(DECLARE, {"input": {"streams": [{"key": " "}]}})
     assert res.errors
 
 
-async def test_another_app_is_another_agent(aexecute, second_app_context):
+async def test_another_app_is_another_agent(
+    aexecute: AExecute, second_app_context: HttpContext
+) -> None:
     mine = await _declare(aexecute, CAMERAS)
     theirs = await _declare(aexecute, CAMERAS, context=second_app_context)
     assert mine[0]["agent"]["id"] != theirs[0]["agent"]["id"]
@@ -146,15 +161,17 @@ async def test_another_app_is_another_agent(aexecute, second_app_context):
 
 
 async def test_another_user_of_the_same_app_is_another_agent(
-    aexecute, other_user_context
-):
+    aexecute: AExecute, other_user_context: HttpContext
+) -> None:
     mine = await _declare(aexecute, CAMERAS)
     theirs = await _declare(aexecute, [{"key": "camera"}], context=other_user_context)
     assert mine[0]["agent"]["id"] != theirs[0]["agent"]["id"]
     assert await Stream.objects.filter(agent_id=mine[0]["agent"]["id"]).acount() == 2
 
 
-async def test_two_processes_declaring_at_once_make_one_agent(authenticated_context):
+async def test_two_processes_declaring_at_once_make_one_agent(
+    authenticated_context: HttpContext,
+) -> None:
     """Two replicas taking the first declaration at the same moment: real threads, each its own connection."""
     from asgiref.sync import async_to_sync
 
@@ -210,9 +227,12 @@ mutation ($input: DeclareStreamsInput!) {
 """
 
 
-async def test_a_data_stream_keeps_its_format_and_a_changed_one_is_written(aexecute):
+async def test_a_data_stream_keeps_its_format_and_a_changed_one_is_written(
+    aexecute: AExecute,
+) -> None:
     res = await aexecute(DECLARE_DATA, {"input": {"streams": [SPECTRUM]}})
     assert not res.errors, res.errors
+    assert res.data is not None
     [stream] = res.data["declareStreams"]
     assert stream["kind"] == "DATA"
     assert stream["format"] == {**SPECTRUM["format"], "reference": None}
@@ -225,7 +245,7 @@ async def test_a_data_stream_keeps_its_format_and_a_changed_one_is_written(aexec
         assert writes.seen == [("updated", int(stream["id"]))]
 
 
-async def test_a_frame_of_more_than_a_packet_is_refused(aexecute):
+async def test_a_frame_of_more_than_a_packet_is_refused(aexecute: AExecute) -> None:
     large = {**SPECTRUM, "format": {**SPECTRUM["format"], "dtype": "float32"}}
     res = await aexecute(DECLARE_DATA, {"input": {"streams": [large]}})
     assert res.errors and "2048 bytes" in res.errors[0].message

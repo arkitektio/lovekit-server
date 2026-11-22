@@ -1,10 +1,12 @@
 import datetime
+from typing import Any
 
 import kante
 import strawberry
 import strawberry_django
 from arkitekt_service.collaborations.guests import object_scope
 from authentikate.strawberry.types import Client, User
+from django.db.models import QuerySet
 from kante.types import Info
 from strawberry.scalars import JSON
 
@@ -37,7 +39,9 @@ def _agent_room(agent_id: int) -> tuple[str, str]:
 )
 class Agent:
     @classmethod
-    def get_queryset(cls, queryset, info, **kwargs):
+    def get_queryset(
+        cls, queryset: QuerySet[models.Agent], info: Info, **kwargs: Any
+    ) -> QuerySet[models.Agent]:
         """Restrict every read of this type to the request's organization; at a root field, a
         guest's to what is in their collaborations."""
         return object_scope(
@@ -124,7 +128,9 @@ class DataFormat:
 )
 class Stream:
     @classmethod
-    def get_queryset(cls, queryset, info, **kwargs):
+    def get_queryset(
+        cls, queryset: QuerySet[models.Stream], info: Info, **kwargs: Any
+    ) -> QuerySet[models.Stream]:
         """Restrict every read of this type to the request's organization; at a root field, a
         guest's to what is in their collaborations."""
         return object_scope(
@@ -200,7 +206,9 @@ class Call:
     """A multi-party LiveKit room about some structures."""
 
     @classmethod
-    def get_queryset(cls, queryset, info, **kwargs):
+    def get_queryset(
+        cls, queryset: QuerySet[models.Call], info: Info, **kwargs: Any
+    ) -> QuerySet[models.Call]:
         """Restrict every read of this type to the request's organization. A call is in no
         collaboration (it is not a structure lovekit hosts): a guest sees none."""
         return object_scope(
@@ -252,7 +260,9 @@ class Call:
 )
 class CallInvite:
     @classmethod
-    def get_queryset(cls, queryset, info, **kwargs):
+    def get_queryset(
+        cls, queryset: QuerySet[models.CallInvite], info: Info, **kwargs: Any
+    ) -> QuerySet[models.CallInvite]:
         """Only the caller's own invitations, in their organization."""
         request = info.context.request
         return object_scope(

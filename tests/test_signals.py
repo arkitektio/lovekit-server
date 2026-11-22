@@ -7,13 +7,16 @@ checked the way rekuest checks it (the instance-key JWT, the body).
 import asyncio
 import json
 import threading
+from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 from arkitekt_service import trust
 from joserfc.jwk import OKPKey
+from pytest_django.fixtures import SettingsWrapper
 
 from lovekit_server.service import service
+from tests.support import AExecute
 
 EXPECTED = {
     "@lovekit/stream": ["CREATED", "UPDATED", "DELETED"],
@@ -32,7 +35,7 @@ class _Intake:
         intake = self
 
         class Handler(BaseHTTPRequestHandler):
-            def do_POST(self):  # noqa: N802
+            def do_POST(self) -> None:  # noqa: N802
                 body = self.rfile.read(int(self.headers["Content-Length"]))
                 intake.received.append(
                     {
@@ -45,7 +48,7 @@ class _Intake:
                 self.send_response(202)
                 self.end_headers()
 
-            def log_message(self, *args):
+            def log_message(self, format: str, *args: object) -> None:
                 pass
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -64,7 +67,7 @@ class _Intake:
 
 
 @pytest.fixture
-def intake(settings):
+def intake(settings: SettingsWrapper) -> Iterator[_Intake]:
     server = _Intake()
     settings.REKUEST_SERVICE = {"REKUEST_URL": server.url, "SERVICE": "lovekit"}
     settings.INSTANCE = {
@@ -78,13 +81,13 @@ def intake(settings):
     server.server.server_close()
 
 
-def test_the_manifest_declares_every_model_signal():
+def test_the_manifest_declares_every_model_signal() -> None:
     assert {
         s["identifier"]: s["kinds"] for s in service.manifest()["signals"]
     } == EXPECTED
 
 
-def test_the_manifest_lists_what_lovekit_hosts_with_its_descriptors():
+def test_the_manifest_lists_what_lovekit_hosts_with_its_descriptors() -> None:
     hosted = {s["identifier"]: s for s in service.manifest()["structures"]}
     assert set(hosted) == {"@lovekit/agent", "@lovekit/stream"}
     assert [
@@ -101,8 +104,8 @@ def test_the_manifest_lists_what_lovekit_hosts_with_its_descriptors():
 @pytest.mark.asyncio
 @pytest.mark.docker
 async def test_a_declaration_is_signalled_once_and_a_restart_not_at_all(
-    intake, aexecute
-):
+    intake: _Intake, aexecute: AExecute
+) -> None:
     res = await aexecute(
         DECLARE,
         {
@@ -112,6 +115,7 @@ async def test_a_declaration_is_signalled_once_and_a_restart_not_at_all(
         },
     )
     assert not res.errors, res.errors
+    assert res.data is not None
     camera, microphone = (stream["id"] for stream in res.data["declareStreams"])
 
     received = await intake.settled()

@@ -35,7 +35,7 @@ class CallEvent:
     )
 
 
-async def calls(self, info: Info) -> AsyncGenerator[CallEvent, None]:
+async def calls(self: object, info: Info) -> AsyncGenerator[CallEvent, None]:
     """The calls your organization starts, as they start, what they come to be about, and when they end.
 
     A start is never your own: you are already on your way in. A change, an end and a
@@ -87,7 +87,7 @@ class CallParticipantEvent:
 
 
 async def call_participants(
-    self, info: Info, call: strawberry.ID
+    self: object, info: Info, call: strawberry.ID
 ) -> AsyncGenerator[CallParticipantEvent, None]:
     """Who joins and leaves this call, as LiveKit reports it. Read ``Call.participants`` once
     for who is in it now, then follow this."""

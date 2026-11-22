@@ -12,6 +12,7 @@ lets the caller publish and subscribe in that room.
 import logging
 
 from asgiref.sync import sync_to_async
+from kante.context import Organization
 from kante.types import Info
 
 from bridge import calls, enums, inputs, models, tokens, types
@@ -22,13 +23,13 @@ from bridge.graphql.mutations.invite import clear_invites_on_join
 logger = logging.getLogger(__name__)
 
 
-def call_group(organization) -> str:
+def call_group(organization: Organization | int) -> str:
     """The channel group an organization's apps listen on. One definition, both sides.
 
     Spelled by hand for the reason ``invite_group`` is: ``org_group`` joins
     its parts with colons, which a channel-layer group name may not hold.
     """
-    organization_id = getattr(organization, "id", organization)
+    organization_id = organization if isinstance(organization, int) else organization.id
     return f"calls.org{organization_id}"
 
 

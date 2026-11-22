@@ -8,7 +8,9 @@ it or join the call from any device.
 import logging
 
 from asgiref.sync import sync_to_async
+from django.db.models import QuerySet
 from django.utils import timezone
+from kante.context import Organization, User
 from kante.types import Info
 
 from bridge import inputs, models, types
@@ -18,14 +20,14 @@ from bridge.channels import call_invite_channel
 logger = logging.getLogger(__name__)
 
 
-def invite_group(organization, invitee: models.User) -> str:
+def invite_group(organization: Organization | int, invitee: models.User) -> str:
     """The channel group one user's apps listen on. One definition, both sides.
 
     Spelled by hand rather than with ``org_group``: a channel-layer group name
     may hold only alphanumerics, hyphens, underscores and periods, and
     ``org_group`` joins its parts with colons.
     """
-    organization_id = getattr(organization, "id", organization)
+    organization_id = organization if isinstance(organization, int) else organization.id
     return f"call_invites.org{organization_id}.user{invitee.id}"
 
 
@@ -67,7 +69,11 @@ async def invite_to_call(info: Info, input: inputs.InviteToCallInput) -> types.C
 
 
 @sync_to_async
-def _dismiss(user, organization, invites) -> list[tuple[int, models.User]]:
+def _dismiss(
+    user: User,
+    organization: Organization,
+    invites: QuerySet[models.CallInvite],
+) -> list[tuple[int, models.User]]:
     """Mark these pending invites dismissed; returns what to announce."""
     gone = []
     for invite in invites.filter(dismissed_at__isnull=True):
@@ -78,7 +84,7 @@ def _dismiss(user, organization, invites) -> list[tuple[int, models.User]]:
 
 
 async def _announce_dismissed(
-    organization, gone: list[tuple[int, models.User]]
+    organization: Organization, gone: list[tuple[int, models.User]]
 ) -> None:
     for invite_id, invitee in gone:
         await call_invite_channel.abroadcast(

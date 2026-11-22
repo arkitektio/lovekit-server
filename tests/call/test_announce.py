@@ -1,17 +1,20 @@
 """A call starting is announced to its organization's open apps, once."""
 
 import asyncio
+from collections.abc import AsyncIterator
 from types import SimpleNamespace
 
 import pytest
 from asgiref.sync import sync_to_async
-from channels.layers import get_channel_layer
+from channels.layers import BaseChannelLayer, get_channel_layer
+from kante.context import HttpContext, Organization
 
 from bridge.channel_signals import CallSignal
 from bridge.channels import call_channel
 from bridge.graphql.mutations.call import call_group
 from bridge.graphql.subscriptions import call as subscription
 from bridge.models import Call
+from tests.support import AExecute, data_of
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -26,15 +29,16 @@ mutation ($input: EnsureCallInput!) { ensureCall(input: $input) { id } }
 IMAGE = {"identifier": "@mikro/image", "object": 42}
 
 
-async def _listen(organization) -> tuple[object, str]:
+async def _listen(organization: Organization) -> tuple[BaseChannelLayer, str]:
     """A channel in the organization's group, as a subscriber's consumer holds one."""
     layer = get_channel_layer()
+    assert layer is not None
     channel = await layer.new_channel()
     await layer.group_add(call_group(organization), channel)
     return layer, channel
 
 
-async def _next(layer, channel) -> CallSignal | None:
+async def _next(layer: BaseChannelLayer, channel: str) -> CallSignal | None:
     """The next announcement on ``channel``, or None when nothing was sent."""
     try:
         message = await asyncio.wait_for(layer.receive(channel), timeout=0.5)
@@ -44,10 +48,12 @@ async def _next(layer, channel) -> CallSignal | None:
     return CallSignal.model_validate(message["message"])
 
 
-async def _events(context, signals: list[CallSignal]) -> list[tuple[str, str]]:
+async def _events(
+    context: HttpContext, signals: list[CallSignal]
+) -> list[tuple[str, str]]:
     """What the ``calls`` subscription yields to ``context`` for these signals, as (kind, call id)."""
 
-    async def listen(info, groups):
+    async def listen(info: object, groups: list[str]) -> AsyncIterator[CallSignal]:
         assert groups == [call_group(context.request.organization)]
         for signal in signals:
             yield signal
@@ -66,7 +72,7 @@ async def _events(context, signals: list[CallSignal]) -> list[tuple[str, str]]:
         call_channel.listen = original
 
 
-async def _heard(context, signals: list[CallSignal]) -> list[str]:
+async def _heard(context: HttpContext, signals: list[CallSignal]) -> list[str]:
     """The calls the subscription announces to ``context`` as started."""
     return [
         call_id for kind, call_id in await _events(context, signals) if kind == "create"
@@ -74,19 +80,22 @@ async def _heard(context, signals: list[CallSignal]) -> list[str]:
 
 
 async def test_a_new_call_is_announced_to_its_organization(
-    aexecute, authenticated_context
-):
+    aexecute: AExecute, authenticated_context: HttpContext
+) -> None:
     layer, channel = await _listen(authenticated_context.request.organization)
 
     res = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
     assert not res.errors, res.errors
+    assert res.data is not None
 
     signal = await _next(layer, channel)
     assert signal is not None
     assert str(signal.create) == res.data["ensureCall"]["id"]
 
 
-async def test_a_reused_call_is_not_announced_again(aexecute, authenticated_context):
+async def test_a_reused_call_is_not_announced_again(
+    aexecute: AExecute, authenticated_context: HttpContext
+) -> None:
     layer, channel = await _listen(authenticated_context.request.organization)
 
     await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
@@ -98,7 +107,7 @@ async def test_a_reused_call_is_not_announced_again(aexecute, authenticated_cont
     assert await _next(layer, channel) is None
 
 
-async def test_another_organization_hears_nothing(aexecute):
+async def test_another_organization_hears_nothing(aexecute: AExecute) -> None:
     from tests.conftest import _make_context
 
     stranger = await sync_to_async(_make_context)(
@@ -108,14 +117,17 @@ async def test_another_organization_hears_nothing(aexecute):
 
     res = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
     assert not res.errors, res.errors
+    assert res.data is not None
     assert await _next(layer, channel) is None
 
 
 async def test_the_subscription_tells_the_others_and_not_the_starter(
-    aexecute, authenticated_context, other_user_context
-):
+    aexecute: AExecute,
+    authenticated_context: HttpContext,
+    other_user_context: HttpContext,
+) -> None:
     res = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
-    call_id = res.data["ensureCall"]["id"]
+    call_id = data_of(res)["ensureCall"]["id"]
     signals = [CallSignal(create=int(call_id))]
 
     assert await _heard(other_user_context, signals) == [call_id]
@@ -124,13 +136,13 @@ async def test_the_subscription_tells_the_others_and_not_the_starter(
 
 
 async def test_the_subscription_drops_a_call_of_another_organization(
-    aexecute, other_user_context
-):
+    aexecute: AExecute, other_user_context: HttpContext
+) -> None:
     """Scoped on the way out as well: a stray signal is not a way across tenants."""
     from tests.conftest import _make_context
 
     res = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
-    call_id = int(res.data["ensureCall"]["id"])
+    call_id = int(data_of(res)["ensureCall"]["id"])
     assert await Call.objects.filter(id=call_id).aexists()
 
     stranger = await sync_to_async(_make_context)(
@@ -143,8 +155,8 @@ async def test_the_subscription_drops_a_call_of_another_organization(
 
 
 async def test_an_open_app_hears_the_call_over_its_websocket(
-    aexecute, other_user_context
-):
+    aexecute: AExecute, other_user_context: HttpContext
+) -> None:
     """The whole way: a subscriber's socket, the group it joins, the call as it yields."""
     from kante.testing import GraphQLWebSocketTestClient
 
@@ -164,6 +176,7 @@ async def test_an_open_app_hears_the_call_over_its_websocket(
             ENSURE_CALL, {"input": {"about": [IMAGE], "title": "Look at this"}}
         )
         assert not res.errors, res.errors
+        assert res.data is not None
 
         message = await listening
         assert message["payload"]["data"]["calls"]["create"] == {
@@ -180,10 +193,10 @@ OTHER_IMAGE = {"identifier": "@mikro/image", "object": 43}
 
 
 async def test_a_new_topic_is_told_to_the_organization_once(
-    aexecute, authenticated_context
-):
+    aexecute: AExecute, authenticated_context: HttpContext
+) -> None:
     res = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
-    call_id = res.data["ensureCall"]["id"]
+    call_id = data_of(res)["ensureCall"]["id"]
     layer, channel = await _listen(authenticated_context.request.organization)
 
     added = await aexecute(
@@ -200,10 +213,12 @@ async def test_a_new_topic_is_told_to_the_organization_once(
 
 
 async def test_a_new_topic_reaches_everyone_the_starter_included(
-    aexecute, authenticated_context, other_user_context
-):
+    aexecute: AExecute,
+    authenticated_context: HttpContext,
+    other_user_context: HttpContext,
+) -> None:
     res = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
-    call_id = res.data["ensureCall"]["id"]
+    call_id = data_of(res)["ensureCall"]["id"]
     signals = [CallSignal(update=int(call_id))]
 
     assert await _events(authenticated_context, signals) == [("update", call_id)]

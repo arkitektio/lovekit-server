@@ -1,3 +1,5 @@
+from typing import Any
+
 import kante
 import strawberry
 import strawberry_django
@@ -39,19 +41,19 @@ def _in_organization(model: type[Model], id: strawberry.ID, info: Info) -> Model
 collaboration_api = collaboration_types.resolvers(fetch=_in_organization)
 
 
-def field(scope: str = "lovekit_watch", **kwargs):
+def field(scope: str = "lovekit_watch", **kwargs: Any) -> Any:  # noqa: ANN401 -- as strawberry_django.field: the value of `x: T = field()`
     "A field an app needs ``scope`` for (``lovekit_watch``, unless it says otherwise)."
     return strawberry_django.field(extensions=[AuthExtension(scopes=[scope])], **kwargs)
 
 
-def mutation(scope: str, **kwargs):
+def mutation(scope: str, **kwargs: Any) -> Any:  # noqa: ANN401 -- as strawberry_django.field: the value of `x: T = mutation()`
     """A write: an app needs ``scope`` for it, a member ``lovekit_editor`` (``lovekit_admin`` holds every role)."""
     return strawberry_django.field(
         extensions=[AuthExtension(scopes=[scope], any_role_of=[EDITOR])], **kwargs
     )
 
 
-def watch_mutation(**kwargs):
+def watch_mutation(**kwargs: Any) -> Any:  # noqa: ANN401 -- as strawberry_django.field: the value of `x: T = watch_mutation()`
     """A token to watch: a read, open to a guest who has the agent in a collaboration."""
     return strawberry_django.field(
         extensions=[AuthExtension(scopes=["lovekit_watch"], allow_scoped=True)],
@@ -59,7 +61,7 @@ def watch_mutation(**kwargs):
     )
 
 
-def subscription(**kwargs) -> strawberry.subscription:
+def subscription(**kwargs: Any) -> strawberry.subscription:
     """A subscription: what it streams is read, so an app needs ``lovekit_watch`` for it."""
     return strawberry.subscription(
         extensions=[AuthSubscribeExtension(scopes=["lovekit_watch"])], **kwargs

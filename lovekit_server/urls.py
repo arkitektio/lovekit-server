@@ -17,7 +17,7 @@ Including another URLconf
 
 from arkitekt_service.service.views import answers_challenge
 from django.contrib import admin
-from django.http import HttpResponse
+from django.http import HttpRequest, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from health_check.views import MainView
 from kante.path import dynamicpath
@@ -28,7 +28,7 @@ from lovekit_server.service import service as rekuest_service
 from .schema import schema
 
 
-def fakts_challenge(request):
+def fakts_challenge(request: HttpRequest) -> HttpResponse:
     """
     Placeholder view for the .well-known/fakts-challenge endpoint.
     This should be replaced with the actual logic to handle the challenge.
@@ -36,7 +36,7 @@ def fakts_challenge(request):
     return HttpResponse("Fakts Challenge Endpoint", status=200)
 
 
-def graphql_schema(request):
+def graphql_schema(request: HttpRequest) -> HttpResponse:
     return HttpResponse(content=schema.as_str(), content_type="text/plain")
 
 

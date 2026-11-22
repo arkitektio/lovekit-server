@@ -2,7 +2,11 @@
 
 import pytest
 from django.conf import settings
+from kante.context import HttpContext
 from livekit.api import TokenVerifier
+from livekit.api.access_token import Claims
+
+from tests.support import AExecute, data_of
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -28,26 +32,28 @@ STREAM = "query ($id: ID!) { stream(id: $id) { id } }"
 STREAMS = "{ streams { id } agents { id } }"
 
 
-def _claims(token: str):
+def _claims(token: str) -> Claims:
     return TokenVerifier(
         settings.LIVEKIT["API_KEY"], settings.LIVEKIT["API_SECRET"]
     ).verify(token)
 
 
-async def _stream(aexecute):
+async def _stream(aexecute: AExecute) -> dict:
     res = await aexecute(DECLARE, {"input": {"streams": [{"key": "camera"}]}})
     assert not res.errors, res.errors
+    assert res.data is not None
     return res.data["declareStreams"][0]
 
 
 async def test_a_member_watches_a_stream_without_publishing(
-    aexecute, other_user_context
-):
+    aexecute: AExecute, other_user_context: HttpContext
+) -> None:
     stream = await _stream(aexecute)
     res = await aexecute(
         WATCH_STREAM, {"input": {"stream": stream["id"]}}, context=other_user_context
     )
     assert not res.errors, res.errors
+    assert res.data is not None
 
     claims = _claims(res.data["watchStream"]["credential"])
     assert claims.video.room == stream["agent"]["roomName"]
@@ -58,10 +64,14 @@ async def test_a_member_watches_a_stream_without_publishing(
     again = await aexecute(
         WATCH_STREAM, {"input": {"stream": stream["id"]}}, context=other_user_context
     )
-    assert _claims(again.data["watchStream"]["credential"]).identity != claims.identity
+    assert (
+        _claims(data_of(again)["watchStream"]["credential"]).identity != claims.identity
+    )
 
 
-async def test_a_member_watches_a_whole_agent(aexecute, other_user_context):
+async def test_a_member_watches_a_whole_agent(
+    aexecute: AExecute, other_user_context: HttpContext
+) -> None:
     stream = await _stream(aexecute)
     res = await aexecute(
         WATCH_AGENT,
@@ -69,17 +79,19 @@ async def test_a_member_watches_a_whole_agent(aexecute, other_user_context):
         context=other_user_context,
     )
     assert not res.errors, res.errors
+    assert res.data is not None
     assert (
         _claims(res.data["watchAgent"]["credential"]).video.room
         == stream["agent"]["roomName"]
     )
 
 
-async def test_an_agent_is_found_by_its_app(aexecute):
+async def test_an_agent_is_found_by_its_app(aexecute: AExecute) -> None:
     stream = await _stream(aexecute)
     # The static test token's client is "static" (authentikate's StaticToken default).
     res = await aexecute('{ agents(filters: { search: "stat" }) { id name } }')
     assert not res.errors, res.errors
+    assert res.data is not None
     assert res.data["agents"] == [{"id": stream["agent"]["id"], "name": "static"}]
     res = await aexecute(
         '{ agents(filters: { clientId: "static", userSub: "1" }) { id } streams(filters: { clientId: "static", userSub: "1" }) { id } }'
@@ -90,7 +102,9 @@ async def test_an_agent_is_found_by_its_app(aexecute):
     }
 
 
-async def test_another_organization_sees_no_stream(aexecute, stranger_context):
+async def test_another_organization_sees_no_stream(
+    aexecute: AExecute, stranger_context: HttpContext
+) -> None:
     stream = await _stream(aexecute)
 
     for document, variables in [
@@ -103,4 +117,5 @@ async def test_another_organization_sees_no_stream(aexecute, stranger_context):
 
     res = await aexecute(STREAMS, context=stranger_context)
     assert not res.errors, res.errors
+    assert res.data is not None
     assert res.data == {"streams": [], "agents": []}

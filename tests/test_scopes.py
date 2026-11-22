@@ -6,6 +6,7 @@ import pytest
 from arkitekt_service.graphql import scope_gaps
 from kante.context import HttpContext, UniversalRequest
 from strawberry.http.temporal_response import TemporalResponse
+from strawberry.types import ExecutionResult
 
 from lovekit_server.schema import schema
 
@@ -22,18 +23,20 @@ def _as(token: str) -> HttpContext:
     )
 
 
-def _reason(result) -> str | None:
+def _reason(result: ExecutionResult) -> str | None:
     return result.errors[0].extensions.get("reason") if result.errors else None
 
 
-def test_every_root_field_asks_for_a_scope_lovekit_declares():
+def test_every_root_field_asks_for_a_scope_lovekit_declares() -> None:
     assert scope_gaps(schema) == []
 
 
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 @pytest.mark.docker
-async def test_an_app_granted_watching_watches_and_streams_nothing(backend_stack):
+async def test_an_app_granted_watching_watches_and_streams_nothing(
+    backend_stack: None,
+) -> None:
     assert (
         await schema.execute(STREAMS, context_value=_as("readertest"))
     ).errors is None
@@ -44,6 +47,6 @@ async def test_an_app_granted_watching_watches_and_streams_nothing(backend_stack
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 @pytest.mark.docker
-async def test_the_all_scope_streams(backend_stack):
+async def test_the_all_scope_streams(backend_stack: None) -> None:
     declared = await schema.execute(DECLARE, context_value=_as("test"))
     assert declared.errors is None, declared.errors

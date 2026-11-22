@@ -1,16 +1,19 @@
 """An agent's declaration is told to its organization's open apps: what changed, and only that."""
 
 import asyncio
+from collections.abc import AsyncIterator
 from types import SimpleNamespace
 
 import pytest
 from asgiref.sync import sync_to_async
-from channels.layers import get_channel_layer
+from channels.layers import BaseChannelLayer, get_channel_layer
+from kante.context import HttpContext, Organization
 
 from bridge.channel_signals import StreamSignal
 from bridge.channels import stream_channel
 from bridge.graphql.mutations.stream import stream_group
 from bridge.graphql.subscriptions import stream as subscription
+from tests.support import AExecute
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -23,21 +26,23 @@ mutation ($input: DeclareStreamsInput!) { declareStreams(input: $input) { id key
 """
 
 
-async def _declare(aexecute, streams):
+async def _declare(aexecute: AExecute, streams: list[dict[str, str]]) -> dict[str, str]:
     res = await aexecute(DECLARE, {"input": {"streams": streams}})
     assert not res.errors, res.errors
+    assert res.data is not None
     return {stream["key"]: stream["id"] for stream in res.data["declareStreams"]}
 
 
-async def _listen(organization) -> tuple[object, str]:
+async def _listen(organization: Organization) -> tuple[BaseChannelLayer, str]:
     """A channel in the organization's group, as a subscriber's consumer holds one."""
     layer = get_channel_layer()
+    assert layer is not None
     channel = await layer.new_channel()
     await layer.group_add(stream_group(organization), channel)
     return layer, channel
 
 
-async def _heard(layer, channel) -> list[StreamSignal]:
+async def _heard(layer: BaseChannelLayer, channel: str) -> list[StreamSignal]:
     """Everything announced on ``channel`` until it falls quiet."""
     heard = []
     while True:
@@ -49,10 +54,12 @@ async def _heard(layer, channel) -> list[StreamSignal]:
         heard.append(StreamSignal.model_validate(message["message"]))
 
 
-async def _events(context, signals: list[StreamSignal]) -> list[tuple[str, str]]:
+async def _events(
+    context: HttpContext, signals: list[StreamSignal]
+) -> list[tuple[str, str]]:
     """What the ``streams`` subscription yields to ``context`` for these signals, as (kind, stream id)."""
 
-    async def listen(info, groups):
+    async def listen(info: object, groups: list[str]) -> AsyncIterator[StreamSignal]:
         assert groups == [stream_group(context.request.organization)]
         for signal in signals:
             yield signal
@@ -75,8 +82,8 @@ async def _events(context, signals: list[StreamSignal]) -> list[tuple[str, str]]
 
 
 async def test_a_declaration_is_announced_as_it_changes(
-    aexecute, authenticated_context
-):
+    aexecute: AExecute, authenticated_context: HttpContext
+) -> None:
     layer, channel = await _listen(authenticated_context.request.organization)
 
     ids = await _declare(aexecute, [{"key": "camera"}, {"key": "overview"}])
@@ -97,8 +104,8 @@ async def test_a_declaration_is_announced_as_it_changes(
 
 
 async def test_the_subscription_yields_only_its_organizations_streams(
-    aexecute, authenticated_context
-):
+    aexecute: AExecute, authenticated_context: HttpContext
+) -> None:
     from tests.conftest import _make_context
 
     ids = await _declare(aexecute, [{"key": "camera"}])
@@ -124,7 +131,9 @@ async def test_the_subscription_yields_only_its_organizations_streams(
     assert [kind for kind, _ in await _events(stranger, signals[:2])] == []
 
 
-async def test_an_open_app_hears_a_new_stream_over_its_websocket(aexecute):
+async def test_an_open_app_hears_a_new_stream_over_its_websocket(
+    aexecute: AExecute,
+) -> None:
     """The whole way: a subscriber's socket, the group it joins, the stream as it yields."""
     from kante.testing import GraphQLWebSocketTestClient
 

@@ -24,7 +24,9 @@ class CallInviteEvent:
     )
 
 
-async def call_invites(self, info: Info) -> AsyncGenerator[CallInviteEvent, None]:
+async def call_invites(
+    self: object, info: Info
+) -> AsyncGenerator[CallInviteEvent, None]:
     """Your invitations as they come and go. Every open app of yours gets them."""
     request = info.context.request
     group = invite_group(request.organization, request.user)

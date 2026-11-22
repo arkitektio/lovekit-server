@@ -14,6 +14,7 @@ from django.conf import settings
 from django.test import AsyncClient
 from django.urls import reverse
 from google.protobuf.json_format import MessageToJson
+from kante.context import HttpContext
 from livekit.api import AccessToken
 from livekit.protocol.models import ParticipantInfo, Room, TrackInfo
 from livekit.protocol.webhook import WebhookEvent
@@ -23,6 +24,7 @@ from bridge.graphql.mutations.call import call_group
 from bridge.graphql.mutations.invite import invite_group
 from bridge.graphql.mutations.stream import stream_group
 from bridge.models import Call, CallInvite, User
+from tests.support import AExecute, Subscribe, data_of
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -87,16 +89,17 @@ def _event(
     return event
 
 
-async def _call(aexecute) -> str:
+async def _call(aexecute: AExecute) -> str:
     res = await aexecute(ENSURE_CALL, {"input": {"about": [IMAGE]}})
     assert not res.errors, res.errors
+    assert res.data is not None
     return res.data["ensureCall"]["id"]
 
 
 # --- signature ----------------------------------------------------------------------------
 
 
-async def test_an_unsigned_or_forged_event_changes_nothing(aexecute):
+async def test_an_unsigned_or_forged_event_changes_nothing(aexecute: AExecute) -> None:
     call_id = await _call(aexecute)
     event = _event("room_finished", f"call-{call_id}")
 
@@ -120,11 +123,15 @@ async def test_an_unsigned_or_forged_event_changes_nothing(aexecute):
 
 
 async def test_a_closed_room_ends_the_call_once_and_stops_its_invitations(
-    aexecute, authenticated_context, other_user_context, subscribe
-):
+    aexecute: AExecute,
+    authenticated_context: HttpContext,
+    other_user_context: HttpContext,
+    subscribe: Subscribe,
+) -> None:
     call_id = await _call(aexecute)
     res = await aexecute(INVITE, {"input": {"call": call_id, "users": ["9"]}})
     assert not res.errors, res.errors
+    assert res.data is not None
     invite = await CallInvite.objects.aget(call_id=call_id)
     invitee = await User.objects.aget(sub="9")
 
@@ -138,9 +145,9 @@ async def test_a_closed_room_ends_the_call_once_and_stops_its_invitations(
 
     ended = (await calls.next())["calls"]["ended"]
     assert ended["id"] == call_id and ended["endedAt"] is not None
-    assert (await invites.next())["callInvites"]["delete"] == str(invite.id)
+    assert (await invites.next())["callInvites"]["delete"] == str(invite.pk)
     res = await aexecute(CALL, {"id": call_id})
-    assert res.data["call"]["endedAt"] == ended["endedAt"]
+    assert data_of(res)["call"]["endedAt"] == ended["endedAt"]
 
     # LiveKit retries a webhook it thinks was lost: the second one is news to nobody.
     assert await _post(_event("room_finished", f"call-{call_id}")) == 200
@@ -149,8 +156,8 @@ async def test_a_closed_room_ends_the_call_once_and_stops_its_invitations(
 
 
 async def test_a_room_coming_back_resumes_an_ended_call_and_only_that(
-    aexecute, authenticated_context, subscribe
-):
+    aexecute: AExecute, authenticated_context: HttpContext, subscribe: Subscribe
+) -> None:
     call_id = await _call(aexecute)
     calls = await subscribe(
         CALLS, {}, call_group(authenticated_context.request.organization)
@@ -170,15 +177,15 @@ async def test_a_room_coming_back_resumes_an_ended_call_and_only_that(
 
 
 async def test_watchers_of_a_call_hear_who_joins_and_leaves_it_and_no_other_call(
-    aexecute, subscribe
-):
+    aexecute: AExecute, subscribe: Subscribe
+) -> None:
     call_id = await _call(aexecute)
-    other_id = (
+    other_id = data_of(
         await aexecute(
             ENSURE_CALL,
             {"input": {"about": [{"identifier": "@mikro/image", "object": 7}]}},
         )
-    ).data["ensureCall"]["id"]
+    )["ensureCall"]["id"]
     watcher = await subscribe(
         PARTICIPANTS, {"call": call_id}, participant_group(int(call_id))
     )
@@ -220,8 +227,8 @@ async def test_watchers_of_a_call_hear_who_joins_and_leaves_it_and_no_other_call
 
 
 async def test_a_call_of_another_organization_cannot_be_watched(
-    aexecute, backend_stack
-):
+    aexecute: AExecute, backend_stack: None
+) -> None:
     from channels.layers import get_channel_layer
     from kante.context import UniversalRequest, WsContext
     from strawberry.channels import ChannelsConsumer
@@ -251,12 +258,13 @@ async def test_a_call_of_another_organization_cannot_be_watched(
 
 
 async def test_an_agents_tracks_make_its_streams_live_and_offline(
-    aexecute, authenticated_context, subscribe
-):
+    aexecute: AExecute, authenticated_context: HttpContext, subscribe: Subscribe
+) -> None:
     res = await aexecute(
         DECLARE, {"input": {"streams": [{"key": "camera"}, {"key": "detector"}]}}
     )
     assert not res.errors, res.errors
+    assert res.data is not None
     streams = {stream["key"]: stream["id"] for stream in res.data["declareStreams"]}
     agent_id = res.data["declareStreams"][0]["agent"]["id"]
     room = f"agent-{agent_id}"
@@ -305,8 +313,8 @@ async def test_an_agents_tracks_make_its_streams_live_and_offline(
 
 
 async def test_rooms_lovekit_does_not_own_are_acknowledged_and_ignored(
-    aexecute, authenticated_context, subscribe
-):
+    aexecute: AExecute, authenticated_context: HttpContext, subscribe: Subscribe
+) -> None:
     calls = await subscribe(
         CALLS, {}, call_group(authenticated_context.request.organization)
     )
