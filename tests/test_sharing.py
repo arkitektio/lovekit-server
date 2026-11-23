@@ -1,31 +1,26 @@
 """A guest of the organization, granted a collaboration and nothing else: what they see, and what they may watch.
 
-Their token lists their collaborations by service instance (`collabs`, instance "1" in the test settings),
-with the roles they hold in each; the guest token is minted per test. A full member ("test")
-puts an agent or a stream in a collaboration; an agent's streams are part of it. Watching is the
-one thing a guest may ask for, of an agent they were granted: a watch token opens its whole room.
+Their token lists their collaborations by key (`collabs`: lok's key, one across the hub), with the
+roles they hold in each; the guest token is minted per test (conftest `guest`). A full member
+("test") puts agents in a collaboration under a fresh key (`addManyToCollaboration`, which makes
+lovekit's row of it); an agent's streams are part of it, and a stream is never put in alone.
+Watching is the one thing a guest may ask for, of an agent they were granted: a watch token opens
+its whole room.
 """
 
-from collections.abc import Callable, Iterator
-from typing import TypeAlias
+import uuid
 
 import pytest
-from arkitekt_service.collaborations import items as collaboration_items
-from arkitekt_service.collaborations.models import Collaboration
-from asgiref.sync import sync_to_async
-from authentikate import settings as authentikate_settings
+from arkitekt_service.collaborations.models import Collaboration, CollaborationItem
 from django.conf import settings as django_settings
-from django.db.models import Model
-from kante.context import HttpContext, UniversalRequest
+from kante.context import HttpContext
 from livekit.api import TokenVerifier
 from livekit.api.access_token import Claims
-from pytest_django.fixtures import SettingsWrapper
-from strawberry.http.temporal_response import TemporalResponse
 from strawberry.types import ExecutionResult
 
 from bridge import models
 from lovekit_server.schema import schema
-from tests.support import data_of
+from tests.support import GuestFactory, data_of, token_context
 
 DECLARE = """
 mutation ($input: DeclareStreamsInput!) {
@@ -38,53 +33,6 @@ AGENT = "query ($id: ID!) { agent(id: $id) { id name streams { key } } }"
 WATCH_STREAM = "mutation ($input: WatchStreamInput!) { watchStream(input: $input) { transport credential } }"
 WATCH_AGENT = "mutation ($input: WatchAgentInput!) { watchAgent(input: $input) { transport credential } }"
 ENSURE_CALL = "mutation ($input: EnsureCallInput!) { ensureCall(input: $input) { id } }"
-
-
-def _context(token: str) -> HttpContext:
-    return HttpContext(
-        request=UniversalRequest(_extensions={}),
-        response=TemporalResponse(),
-        headers={"Authorization": f"Bearer {token}"},
-        type="http",
-    )
-
-
-#: The ``guest`` fixture: a context for a guest granted these collaborations (or ids), with these roles.
-Guest: TypeAlias = Callable[[dict[Collaboration | str, list[str]]], HttpContext]
-
-
-@pytest.fixture
-def guest(
-    db: None, authenticated_context: HttpContext, settings: SettingsWrapper
-) -> Iterator[Guest]:
-    """``guest({collaboration: roles})``: a context presenting a guest's token granted those collaborations on instance "1"."""
-
-    def mint(collaborations: dict[Collaboration | str, list[str]]) -> HttpContext:
-        granted = {
-            str(
-                collaboration.pk
-                if isinstance(collaboration, Collaboration)
-                else collaboration
-            ): roles
-            for collaboration, roles in collaborations.items()
-        }
-        settings.AUTHENTIKATE = {
-            **settings.AUTHENTIKATE,
-            "static_tokens": {
-                **settings.AUTHENTIKATE["static_tokens"],
-                "guest": {
-                    "sub": "20",
-                    "roles": [],
-                    "collabs": {"1": granted},
-                    "scope": "openid lovekit_all",
-                },
-            },
-        }
-        authentikate_settings.cached_settings = None
-        return _context("guest")
-
-    yield mint
-    authentikate_settings.cached_settings = None
 
 
 async def _run(ctx: HttpContext, query: str, **variables: object) -> ExecutionResult:
@@ -101,18 +49,34 @@ async def _declare(ctx: HttpContext, *keys: str) -> dict[str, dict]:
     return {stream["key"]: stream for stream in res.data["declareStreams"]}
 
 
-async def _collaboration(ctx: HttpContext, *objects: Model) -> Collaboration:
-    """A collaboration of the organization holding ``objects``, as a full member puts them in."""
+ADD_MANY = "mutation ($input: AddManyToCollaborationInput!) { addManyToCollaboration(input: $input) { key name } }"
+IDENTIFIERS = {models.Agent: "@lovekit/agent", models.Stream: "@lovekit/stream"}
 
-    def make() -> Collaboration:
-        collaboration = Collaboration.objects.create(
-            organization=ctx.request.organization, name="Shared"
-        )
-        for obj in objects:
-            collaboration_items.add(collaboration, obj)
-        return collaboration
 
-    return await sync_to_async(make)()
+def _put_in(key: str, *objects: models.Agent | models.Stream) -> dict[str, object]:
+    """The ``addManyToCollaboration`` input putting ``objects`` in the collaboration ``key``."""
+    return {
+        "collaboration": key,
+        "name": "Shared",
+        "objects": [
+            {"identifier": IDENTIFIERS[type(obj)], "object": str(obj.pk)}
+            for obj in objects
+        ],
+    }
+
+
+async def _collaboration(ctx: HttpContext, *objects: models.Agent) -> str:
+    """A collaboration of the organization holding ``objects``, as a full member puts them in:
+    under a fresh key, as lok hands one out, in one ``addManyToCollaboration``. Its key."""
+    key = str(uuid.uuid4())
+    result = await _run(token_context("test"), ADD_MANY, input=_put_in(key, *objects))
+    assert not result.errors, result.errors
+    added = data_of(result)
+    assert added["addManyToCollaboration"] == {"key": key, "name": "Shared"}
+    assert await Collaboration.objects.filter(
+        key=key, organization=ctx.request.organization
+    ).aexists()
+    return key
 
 
 async def _agent(stream: dict) -> models.Agent:
@@ -134,7 +98,9 @@ def _refused(result: ExecutionResult, reason: str) -> None:
 @pytest.mark.asyncio
 @pytest.mark.docker
 async def test_a_guest_sees_the_agent_in_their_collaboration_and_every_stream_it_offers(
-    authenticated_context: HttpContext, second_app_context: HttpContext, guest: Guest
+    authenticated_context: HttpContext,
+    second_app_context: HttpContext,
+    guest: GuestFactory,
 ) -> None:
     shared = await _declare(authenticated_context, "camera", "overview")
     other = await _declare(second_app_context, "elsewhere")
@@ -162,7 +128,7 @@ async def test_a_guest_sees_the_agent_in_their_collaboration_and_every_stream_it
 @pytest.mark.asyncio
 @pytest.mark.docker
 async def test_a_stream_the_agent_declares_later_is_shared_with_it(
-    authenticated_context: HttpContext, guest: Guest
+    authenticated_context: HttpContext, guest: GuestFactory
 ) -> None:
     first = await _declare(authenticated_context, "camera")
     ctx = guest(
@@ -188,15 +154,39 @@ async def test_a_stream_is_shared_with_its_agent_never_alone(
     """A stream is part of its agent: it is put in a collaboration with the agent, whose room it is heard in."""
     streams = await _declare(authenticated_context, "camera", "microphone")
     camera = await models.Stream.objects.aget(id=streams["camera"]["id"])
-    with pytest.raises(collaboration_items.SharedWithItsWhole):
-        await _collaboration(authenticated_context, camera)
+    key = str(uuid.uuid4())
+
+    alone = await _run(token_context("test"), ADD_MANY, input=_put_in(key, camera))
+
+    assert alone.errors, "a stream went in without its agent"
+    assert not await CollaborationItem.objects.aexists()
+    assert not await Collaboration.objects.filter(key=key).aexists(), (
+        "all or none: not even the collaboration's row"
+    )
+    with_agent = await _run(
+        token_context("test"),
+        ADD_MANY,
+        input=_put_in(key, await _agent(streams["camera"]), camera),
+    )
+    assert not with_agent.errors, with_agent.errors
+    inside = data_of(
+        await _run(
+            token_context("test"),
+            "query ($key: ID!) { streams(filters: {inCollaboration: $key}) { key } }",
+            key=key,
+        )
+    )
+    assert sorted(stream["key"] for stream in inside["streams"]) == [
+        "camera",
+        "microphone",
+    ], "with its agent, and its sibling with it"
 
 
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 @pytest.mark.docker
 async def test_a_guest_watches_a_shared_agent_without_publishing(
-    authenticated_context: HttpContext, guest: Guest
+    authenticated_context: HttpContext, guest: GuestFactory
 ) -> None:
     streams = await _declare(authenticated_context, "camera")
     camera = streams["camera"]
@@ -224,7 +214,9 @@ async def test_a_guest_watches_a_shared_agent_without_publishing(
 @pytest.mark.asyncio
 @pytest.mark.docker
 async def test_a_guest_watches_no_agent_they_were_not_granted(
-    authenticated_context: HttpContext, second_app_context: HttpContext, guest: Guest
+    authenticated_context: HttpContext,
+    second_app_context: HttpContext,
+    guest: GuestFactory,
 ) -> None:
     streams = await _declare(authenticated_context, "camera", "microphone")
     other = await _declare(second_app_context, "elsewhere")
@@ -253,7 +245,7 @@ async def test_a_guest_watches_no_agent_they_were_not_granted(
 @pytest.mark.asyncio
 @pytest.mark.docker
 async def test_a_guest_publishes_nothing_joins_no_call_and_hears_nothing(
-    authenticated_context: HttpContext, guest: Guest
+    authenticated_context: HttpContext, guest: GuestFactory
 ) -> None:
     streams = await _declare(authenticated_context, "camera")
     call = await _run(
@@ -264,10 +256,8 @@ async def test_a_guest_publishes_nothing_joins_no_call_and_hears_nothing(
     assert not call.errors, call.errors
     assert call.data is not None
     call_id = call.data["ensureCall"]["id"]
-    collaboration = await _collaboration(
-        authenticated_context, await _agent(streams["camera"])
-    )
-    ctx = guest({collaboration: ["admin", "editor"]})
+    key = await _collaboration(authenticated_context, await _agent(streams["camera"]))
+    ctx = guest({key: ["admin", "editor"]})
 
     for document, variables in [
         (DECLARE, {"input": {"streams": [{"key": "mine"}]}}),
@@ -288,11 +278,19 @@ async def test_a_guest_publishes_nothing_joins_no_call_and_hears_nothing(
             "mutation ($input: CollaborationObjectInput!) { addToCollaboration(input: $input) { id } }",
             {
                 "input": {
-                    "collaboration": str(collaboration.pk),
+                    "collaboration": key,
                     "identifier": "@lovekit/agent",
                     "object": streams["camera"]["agent"]["id"],
                 }
             },
+        ),
+        (
+            ADD_MANY,
+            {"input": _put_in(str(uuid.uuid4()), await _agent(streams["camera"]))},
+        ),
+        (
+            "mutation ($input: ShareWorkflowInput!) { shareWorkflow(input: $input) { dryRun } }",
+            {"input": {"collaboration": key, "rootTask": "any", "dryRun": True}},
         ),
     ]:
         _refused(await _run(ctx, document, **variables), "SCOPED_READ_ONLY")
@@ -318,42 +316,47 @@ async def test_a_guest_publishes_nothing_joins_no_call_and_hears_nothing(
 @pytest.mark.asyncio
 @pytest.mark.docker
 async def test_a_member_shares_an_agent_and_the_guest_sees_only_that_collaboration(
-    authenticated_context: HttpContext, guest: Guest
+    authenticated_context: HttpContext, guest: GuestFactory
 ) -> None:
     streams = await _declare(authenticated_context, "camera")
-    created = await _run(
-        authenticated_context,
-        'mutation { createCollaboration(input: { name: "Microscope" }) { id } }',
-    )
-    assert not created.errors, created.errors
-    assert created.data is not None
-    collaboration = created.data["createCollaboration"]["id"]
+    key = str(uuid.uuid4())  # lok's: nothing of it is here until something is put in
     added = await _run(
         authenticated_context,
-        "mutation ($input: CollaborationObjectInput!) { addToCollaboration(input: $input) { id items { identifier objectId brought } } }",
+        "mutation ($input: CollaborationObjectInput!) { addToCollaboration(input: $input) { key name items { identifier objectId brought } } }",
         input={
-            "collaboration": collaboration,
+            "collaboration": key,
+            "name": "Microscope",
             "identifier": "@lovekit/agent",
             "object": streams["camera"]["agent"]["id"],
         },
     )
     assert not added.errors, added.errors
     assert added.data is not None
-    assert added.data["addToCollaboration"]["items"] == [
-        {
-            "identifier": "@lovekit/agent",
-            "objectId": streams["camera"]["agent"]["id"],
-            "brought": False,
-        }
-    ]
+    assert added.data["addToCollaboration"] == {
+        "key": key,
+        "name": "Microscope",
+        "items": [
+            {
+                "identifier": "@lovekit/agent",
+                "objectId": streams["camera"]["agent"]["id"],
+                "brought": False,
+            }
+        ],
+    }
+    assert data_of(
+        await _run(
+            authenticated_context,
+            "query ($key: ID!) { collaboration(key: $key) { key itemCount } }",
+            key=key,
+        )
+    ) == {"collaboration": {"key": key, "itemCount": 1}}
     await _collaboration(authenticated_context)  # another, not granted
-    ctx = guest({collaboration: []})
+    ctx = guest({key: []})
 
-    listed = await _run(ctx, "{ collaborations { id name } streams { key } }")
+    listed = await _run(ctx, "{ collaborations { key name } streams { key } }")
     assert not listed.errors, listed.errors
-    assert listed.data is not None
     assert listed.data == {
-        "collaborations": [{"id": collaboration, "name": "Microscope"}],
+        "collaborations": [{"key": key, "name": "Microscope"}],
         "streams": [{"key": "camera"}],
     }
 

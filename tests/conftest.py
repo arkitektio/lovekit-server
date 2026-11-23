@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator, Iterator, Mapping
 import psycopg
 import pytest
 import pytest_asyncio
+from authentikate import settings as authentikate_settings
 from authentikate.models import Client, Membership, Organization, User
 from django.apps import AppConfig
 from django.contrib.contenttypes.management import create_contenttypes
@@ -15,10 +16,17 @@ from dokker import testing
 from kante.context import Context, HttpContext, UniversalRequest, WsContext
 from livekit.api import LiveKitAPI
 from pytest_django import DjangoDbBlocker
+from pytest_django.fixtures import SettingsWrapper
 from strawberry.http.temporal_response import TemporalResponse
 from strawberry.types import ExecutionResult
 
-from tests.support import AExecute, Subscribe, Subscriber
+from tests.support import (
+    AExecute,
+    GuestFactory,
+    Subscribe,
+    Subscriber,
+    token_context,
+)
 
 
 @pytest.fixture(scope="session")
@@ -284,3 +292,30 @@ async def subscribe(db: None, backend_stack: None) -> AsyncIterator[Subscribe]:
         task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await task
+
+
+@pytest.fixture
+def guest(
+    db: None, authenticated_context: HttpContext, settings: SettingsWrapper
+) -> Iterator[GuestFactory]:
+    """``guest({key: roles})``: a context presenting a guest of the test organization (sub 20),
+    granted those collaborations by their key, as lok lists them in the token's ``collabs``."""
+
+    def mint(collaborations: Mapping[str, list[str]]) -> HttpContext:
+        settings.AUTHENTIKATE = {
+            **settings.AUTHENTIKATE,
+            "static_tokens": {
+                **settings.AUTHENTIKATE["static_tokens"],
+                "guest": {
+                    "sub": "20",
+                    "roles": [],
+                    "collabs": dict(collaborations),
+                    "scope": "openid lovekit_all",
+                },
+            },
+        }
+        authentikate_settings.cached_settings = None
+        return token_context("guest")
+
+    yield mint
+    authentikate_settings.cached_settings = None

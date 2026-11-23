@@ -138,7 +138,7 @@ class Query:
     )
     collaboration: collaboration_types.Collaboration = field(
         resolver=collaboration_api.collaboration,
-        description="Get a single collaboration by ID",
+        description="Get a single collaboration by its key (lok's): what was put in it here",
     )
 
 
@@ -147,25 +147,30 @@ class Mutation:
     """The root mutation type"""
 
     # Collaborations: what a guest of the organization is granted to see; made by its editors, never a guest
-    create_collaboration: collaboration_types.Collaboration = mutation(
-        scope="lovekit_share",
-        resolver=collaboration_api.create_collaboration,
-        description="Create an empty collaboration, to put agents and streams in and grant a guest",
-    )
     add_to_collaboration: collaboration_types.Collaboration = mutation(
         scope="lovekit_share",
         resolver=collaboration_api.add_to_collaboration,
-        description="Put an agent or a stream in a collaboration: an agent brings every stream it offers",
+        description="Put an agent in a collaboration (lok's, by its key): it brings every stream it offers. The collaboration's row here is made the first time something is put in",
+    )
+    add_many_to_collaboration: collaboration_types.Collaboration = mutation(
+        scope="lovekit_share",
+        resolver=collaboration_api.add_many_to_collaboration,
+        description="Put several agents in a collaboration (by its key) at once, each with every stream it offers: all of them, or none",
+    )
+    share_workflow: collaboration_types.WorkflowShare = mutation(
+        scope="lovekit_share",
+        resolver=collaboration_api.share_workflow,
+        description="Put what a workflow (its root task) created in lovekit in a collaboration. Nothing here says which workflow made it: an agent and its streams are the app's, across workflows, so the report lists them as unknown and puts nothing in. `dryRun` only says what would be put in",
     )
     remove_from_collaboration: collaboration_types.Collaboration = mutation(
         scope="lovekit_share",
         resolver=collaboration_api.remove_from_collaboration,
-        description="Take an agent or a stream out of a collaboration",
+        description="Take an agent out of a collaboration (by its key), and its streams with it",
     )
     delete_collaboration: strawberry.ID = mutation(
         scope="lovekit_share",
         resolver=collaboration_api.delete_collaboration,
-        description="Delete a collaboration: whoever was granted it sees nothing of it any more",
+        description="Take everything lovekit put in a collaboration (by its key) out of it: whoever was granted it sees nothing of it here any more. lok's collaboration, and its grants, stay",
     )
 
     # Agent streams: what an app instance offers live, its own and nobody else's

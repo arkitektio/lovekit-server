@@ -1,5 +1,6 @@
 import strawberry
 import strawberry_django
+from arkitekt_service.collaborations.filters import SharingFilterMixin
 from asgiref.sync import async_to_sync
 from django.db.models import Q, QuerySet
 
@@ -13,7 +14,7 @@ class StreamOrder:
 
 
 @strawberry_django.filter_type(models.Agent, description="Filter for agents")
-class AgentFilter:
+class AgentFilter(SharingFilterMixin):
     @strawberry_django.filter_field
     def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
         return Q(**{f"{prefix}id__in": value})
@@ -38,7 +39,7 @@ class AgentFilter:
 
 
 @strawberry_django.filter_type(models.Stream, description="Filter for streams")
-class StreamFilter:
+class StreamFilter(SharingFilterMixin):
     @strawberry_django.filter_field
     def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
         return Q(**{f"{prefix}id__in": value})

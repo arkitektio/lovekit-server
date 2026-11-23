@@ -11,12 +11,18 @@ changes it, or stops offering it. ``declareStreams`` saves only what changed, so
 restarts with the streams it had announces nothing. Whether a stream is live is LiveKit's and
 is never signalled. Calls are not hosted here.
 
-A full member shares an agent with a guest of the organization by putting it in a collaboration:
-its streams are part of it, so the guest sees each one the agent offers, also those it declares
-later. A stream put in alone is seen alone; its agent, and with it the stream's siblings, is not
-brought along (no ``depends``), and watching it is refused: a watch token opens the agent's whole
-room, every track in it (``bridge.graphql.mutations.stream``). Calls, not hosted, are in no
-collaboration.
+A full member shares an agent with a guest of the organization by putting it in a collaboration
+(lok's, by its key): its streams are part of it, so the guest sees each one the agent offers, also
+those it declares later, and may watch them: a watch token opens the agent's whole room, every
+track in it (``bridge.graphql.mutations.stream``). A stream is never put in alone: its agent is its
+whole (its required, cascading key), and a collaboration refuses a part without it. Calls, not
+hosted, are in no collaboration.
+
+Nothing here says which workflow made it (no ``created_through``, no history): an agent is the
+identity an app runs as, made the first time it declares its streams, and kept across every
+workflow after; its streams are what it declares, upserted by key. A workflow did not make them,
+so sharing one (``shareWorkflow``) reports both as ``unknown`` and puts nothing in: handing out an
+agent opens its whole room, and that is a member's decision, by hand.
 """
 
 from arkitekt_service.service import Service, organization_of

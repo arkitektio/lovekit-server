@@ -2,11 +2,26 @@
 
 import asyncio
 import contextlib
-from collections.abc import Awaitable, Mapping
-from typing import Any, Protocol
+from collections.abc import Awaitable, Callable, Mapping
+from typing import Any, Protocol, TypeAlias
 
-from kante.context import Context, WsContext
+from kante.context import Context, HttpContext, UniversalRequest, WsContext
+from strawberry.http.temporal_response import TemporalResponse
 from strawberry.types import ExecutionResult
+
+#: ``guest({key: roles})``: a context presenting a guest's token granted those collaborations, by
+#: their key (lok's), with the roles held in each (``[]``: view only).
+GuestFactory: TypeAlias = Callable[[Mapping[str, list[str]]], HttpContext]
+
+
+def token_context(token: str) -> HttpContext:
+    """A request presenting the static token ``token``, as a client sends it: nothing resolved yet."""
+    return HttpContext(
+        request=UniversalRequest(_extensions={}),
+        response=TemporalResponse(),
+        headers={"Authorization": f"Bearer {token}"},
+        type="http",
+    )
 
 
 class AExecute(Protocol):
