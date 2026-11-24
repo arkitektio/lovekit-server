@@ -250,3 +250,58 @@ async def test_a_frame_of_more_than_a_packet_is_refused(aexecute: AExecute) -> N
     res = await aexecute(DECLARE_DATA, {"input": {"streams": [large]}})
     assert res.errors and "2048 bytes" in res.errors[0].message
     assert await Stream.objects.acount() == 0
+
+
+CAMERA = {
+    "key": "camera",
+    "kind": "VIDEO",
+    "videoFormat": {
+        "axes": [
+            {"name": "y", "type": "SPACE"},
+            {"name": "x", "type": "SPACE"},
+            {"name": "c", "type": "CHANNEL"},
+        ],
+        "calibration": [
+            {"axis": "y", "unit": "µm", "scale": 0.65, "offset": 0.0},
+            {"axis": "x", "unit": "µm", "scale": 0.65, "offset": 0.0},
+        ],
+        "reference": "stage",
+    },
+}
+
+DECLARE_VIDEO = """
+mutation ($input: DeclareStreamsInput!) {
+  declareStreams(input: $input) { id kind format { dtype } videoFormat { shape reference axes { name type } calibration { axis unit scale offset } } }
+}
+"""
+
+
+async def test_a_video_stream_says_where_its_pixels_are(aexecute: AExecute) -> None:
+    res = await aexecute(
+        DECLARE_VIDEO, {"input": {"streams": [CAMERA, {"key": "plain"}]}}
+    )
+    assert not res.errors, res.errors
+    assert res.data is not None
+    camera, plain = res.data["declareStreams"]
+    assert camera["format"] is None
+    assert camera["videoFormat"] == {**CAMERA["videoFormat"], "shape": None}
+    assert plain["videoFormat"] is None
+
+
+async def test_a_video_format_is_refused_off_video_and_checked(
+    aexecute: AExecute,
+) -> None:
+    on_data = {**SPECTRUM, "videoFormat": CAMERA["videoFormat"]}
+    res = await aexecute(DECLARE_VIDEO, {"input": {"streams": [on_data]}})
+    assert res.errors and "only a video stream" in res.errors[0].message
+
+    stray = {
+        **CAMERA,
+        "videoFormat": {
+            **CAMERA["videoFormat"],
+            "calibration": [{"axis": "z", "unit": "µm"}],
+        },
+    }
+    res = await aexecute(DECLARE_VIDEO, {"input": {"streams": [stray]}})
+    assert res.errors and "no axis of the format: z" in res.errors[0].message
+    assert await Stream.objects.acount() == 0

@@ -10,7 +10,8 @@ who has the agent in one of their collaborations: a watching connection opens th
 room, so it is the agent that has to be shared, not only the stream.
 
 A data stream declares what a frame holds (``format``). A frame is at most ``MAX_FRAME_BYTES``,
-so it is one packet on any carrier.
+so it is one packet on any carrier. A video stream may declare where its pixels are
+(``videoFormat``).
 """
 
 import logging
@@ -72,21 +73,40 @@ def _validate_format(key: str, format: inputs.DataFormatInput) -> None:
         raise ValueError(
             f"{key}: a frame of {size} bytes is more than the {MAX_FRAME_BYTES} a data stream carries; send fewer or smaller values"
         )
-    names = [axis.name for axis in format.axes]
-    if len(names) != len(format.shape) or len(set(names)) != len(names):
+    _check_axes(key, format.axes, format.calibration, format.shape)
+
+
+def _check_axes(
+    key: str,
+    axes: list[inputs.AxisInput],
+    calibration: list[inputs.CalibrationInput],
+    shape: list[int] | None,
+) -> None:
+    names = [axis.name for axis in axes]
+    if len(set(names)) != len(names) or (
+        shape is not None and len(shape) != len(names)
+    ):
         raise ValueError(
             f"{key}: a format names one axis per dimension of its shape, each once"
         )
-    unknown = sorted(
-        {calibration.axis for calibration in format.calibration} - set(names)
-    )
+    unknown = sorted({c.axis for c in calibration} - set(names))
     if unknown:
         raise ValueError(
             f"{key}: calibrated, but no axis of the format: {', '.join(unknown)}"
         )
 
 
-def _stored_format(format: inputs.DataFormatInput | None) -> dict | None:
+def _validate_video_format(key: str, format: inputs.VideoFormatInput) -> None:
+    if not format.axes:
+        raise ValueError(f"{key}: a video format names its axes")
+    if format.shape is not None and any(size < 1 for size in format.shape):
+        raise ValueError(f"{key}: every dimension of a frame holds at least one value")
+    _check_axes(key, format.axes, format.calibration, format.shape)
+
+
+def _stored_format(
+    format: inputs.DataFormatInput | inputs.VideoFormatInput | None,
+) -> dict | None:
     """A declared format as its row keeps it."""
     if format is None:
         return None
@@ -107,6 +127,12 @@ def _validate(input: inputs.DeclareStreamsInput) -> None:
             f"Each stream is declared once; declared more than once: {', '.join(duplicates)}"
         )
     for stream in input.streams:
+        if stream.video_format is not None:
+            if stream.kind != enums.StreamKind.VIDEO:
+                raise ValueError(
+                    f"{stream.key}: only a video stream has a video format"
+                )
+            _validate_video_format(stream.key, stream.video_format)
         if stream.kind != enums.StreamKind.DATA:
             if stream.format is not None:
                 raise ValueError(f"{stream.key}: only a data stream has a format")
@@ -140,6 +166,7 @@ def _declare(
                 "kind": declared.kind.value,
                 "description": declared.description,
                 "format": _stored_format(declared.format),
+                "video_format": _stored_format(declared.video_format),
             }
             stream = existing.pop(declared.key, None)
             if stream is None:

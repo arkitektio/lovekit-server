@@ -119,6 +119,20 @@ class DataFormat:
     )
 
 
+@strawberry.type(
+    description="Where a video stream's pixels are: its axes, their calibration and the space they are in"
+)
+class VideoFormat:
+    axes: list[Axis] = strawberry.field(description="The axes of a frame in its order")
+    shape: list[int] | None = strawberry.field(
+        description="The size of a frame; none when known only from the first frame"
+    )
+    calibration: list[Calibration]
+    reference: str | None = strawberry.field(
+        description="The space the axes are in, named as mikro names a coordinate system's reference"
+    )
+
+
 @strawberry_django.type(
     models.Stream,
     filters=filters.StreamFilter,
@@ -171,6 +185,26 @@ class Stream:
                 Calibration(**calibration) for calibration in stored["calibration"]
             ],
             unit=stored["unit"],
+            reference=stored["reference"],
+        )
+
+    @strawberry_django.field(
+        only=["video_format"],
+        description="Where a frame's pixels are; only a video stream that declared it has one.",
+    )
+    def video_format(self) -> VideoFormat | None:
+        stored = self.video_format
+        if stored is None:
+            return None
+        return VideoFormat(
+            axes=[
+                Axis(name=axis["name"], type=enums.AxisType(axis["type"]))
+                for axis in stored["axes"]
+            ],
+            shape=stored["shape"],
+            calibration=[
+                Calibration(**calibration) for calibration in stored["calibration"]
+            ],
             reference=stored["reference"],
         )
 

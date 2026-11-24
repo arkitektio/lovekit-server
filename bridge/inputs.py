@@ -50,6 +50,26 @@ class DataFormatInput:
     )
 
 
+@strawberry.input(
+    description="Where a video stream's pixels are: its axes, their calibration and the space they are in"
+)
+class VideoFormatInput:
+    axes: list[AxisInput] = strawberry.field(
+        description="The axes of a frame in its order, e.g. y, x, c"
+    )
+    shape: list[int] | None = strawberry.field(
+        default=None,
+        description="The size of a frame, one value per axis; none when it is known only from the first frame",
+    )
+    calibration: list[CalibrationInput] = strawberry.field(
+        default_factory=list, description="The axes that measure something, and what"
+    )
+    reference: str | None = strawberry.field(
+        default=None,
+        description="The space the axes are in, named as mikro names a coordinate system's reference",
+    )
+
+
 @strawberry.input(description="One stream an agent offers")
 class StreamDeclarationInput:
     key: str = strawberry.field(
@@ -67,6 +87,10 @@ class StreamDeclarationInput:
     format: DataFormatInput | None = strawberry.field(
         default=None,
         description="What a frame holds: needed for a data stream, refused for any other",
+    )
+    video_format: VideoFormatInput | None = strawberry.field(
+        default=None,
+        description="Where a frame's pixels are: optional for a video stream, refused for any other",
     )
 
 

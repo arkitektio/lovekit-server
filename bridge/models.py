@@ -89,6 +89,11 @@ class Stream(Described):
         blank=True,
         help_text="What a frame of a data stream holds (dtype, shape, axes, calibration); null for video and audio",
     )
+    video_format = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="Where a video frame's pixels are (axes, shape, calibration, reference); null when not declared",
+    )
     created_at = models.DateTimeField(
         auto_now_add=True, help_text="When the agent first declared this stream"
     )
