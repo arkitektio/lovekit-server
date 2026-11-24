@@ -17,7 +17,7 @@ import logging
 import math
 
 import strawberry
-from arkitekt_service.collaborations.guests import arequire_in_collaboration
+from arkitekt_service.collaborations.guests import arequire_in_collaboration, guest_of
 from asgiref.sync import sync_to_async
 from django.db import transaction
 from kante.context import Organization
@@ -219,6 +219,7 @@ async def publisher_connection(info: Info) -> types.Connection:
             user=request.user,
             can_publish=True,
             can_publish_data=True,
+            can_update_own_metadata=True,
             metadata={"agent": agent.id},
             stable=True,
         )
@@ -231,7 +232,15 @@ def _watching(info: Info, agent: models.Agent) -> types.Connection:
     user = info.context.request.user
     return _livekit(
         tokens.participant_token(
-            agent.room_name, kind="user", id=user.id, user=user, can_publish=False
+            agent.room_name,
+            kind="user",
+            id=user.id,
+            user=user,
+            can_publish=False,
+            # Data packets only, for RPC: a member times latency pings to the agent
+            # (`lovekit.ping`); its media and data tracks are read from the agent alone.
+            # A guest (a collaboration's) sends nothing into the room.
+            can_publish_data=guest_of(info) is None,
         )
     )
 

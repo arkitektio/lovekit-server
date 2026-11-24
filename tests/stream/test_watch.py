@@ -59,6 +59,9 @@ async def test_a_member_watches_a_stream_without_publishing(
     assert claims.video.room == stream["agent"]["roomName"]
     assert claims.video.can_subscribe is True
     assert claims.video.can_publish is False
+    # A member gets data packets for RPC: it times latency pings to the agent (`lovekit.ping`).
+    assert claims.video is not None
+    assert claims.video.can_publish_data is True
     # A watcher's identity is its own, so two windows watch side by side.
     assert claims.identity.startswith("user-")
     again = await aexecute(

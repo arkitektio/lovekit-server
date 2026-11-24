@@ -112,6 +112,9 @@ async def test_the_publish_token_is_the_agents_one_identity(aexecute: AExecute) 
     assert claims.identity == f"agent-{stream['agent']['id']}"
     assert claims.video.room == stream["agent"]["roomName"]
     assert claims.video.can_publish is True
+    # It reports its own path to the media server as attributes (lovekit's `lovekit.*`).
+    assert claims.video is not None
+    assert claims.video.can_update_own_metadata is True
     # Every token of the agent is the same participant: a restart replaces, never duplicates.
     assert (
         TokenVerifier(settings.LIVEKIT["API_KEY"], settings.LIVEKIT["API_SECRET"])

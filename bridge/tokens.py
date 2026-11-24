@@ -34,6 +34,7 @@ def participant_token(
     user: User,
     can_publish: bool,
     can_publish_data: bool = False,
+    can_update_own_metadata: bool = False,
     metadata: dict | None = None,
     stable: bool = False,
 ) -> str:
@@ -56,6 +57,9 @@ def participant_token(
                 can_publish=can_publish,
                 can_subscribe=True,
                 can_publish_data=can_publish_data,
+                # Its own attributes: how an agent tells viewers its path to the media server
+                # (lovekit's `lovekit.*` attributes). LiveKit drops them without this.
+                can_update_own_metadata=can_update_own_metadata,
             )
         )
         .to_jwt()
