@@ -157,6 +157,11 @@ contract = Contract(
         "ensureadmin": Job(
             ("ensureadmin",), "Create the operator account the config names"
         ),
+        "purge_orphaned_stores": Job(
+            ("purge_orphaned_stores",),
+            "Delete the stored objects of deleted data after the grace period, and of uploads never finished",
+            schedule="daily 03:00",
+        ),
     },
     setup=("ensureadmin",),
 )
